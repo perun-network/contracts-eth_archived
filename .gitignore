@@ -1,0 +1,8 @@
+node_modules
+yarn-error.log
+
+# generated files
+/build
+/types
+/test/*.js.map
+/test/*.js
