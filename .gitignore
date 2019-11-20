@@ -4,5 +4,8 @@ yarn-error.log
 # generated files
 /build
 /types
+/coverage
 /test/*.js.map
 /test/*.js
+package-lock.json
+coverage.json
