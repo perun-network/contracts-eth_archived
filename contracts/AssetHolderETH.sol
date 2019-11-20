@@ -9,28 +9,28 @@ import "./SafeMath.sol";
 
 contract AssetHolderETH is AssetHolder {
 
-	using SafeMath for uint256;
+    using SafeMath for uint256;
 
-	constructor(address _adjudicator) public {
-		adjudicator = _adjudicator;
-	}
+    constructor(address _adjudicator) public {
+        adjudicator = _adjudicator;
+    }
 
-	// Deposit is used to deposit money into a channel
-	// The parameter fundingID = H(channelID||address)
-	// This hides both the channelID as well as the participant address until a channel is settled.
-	function deposit(bytes32 fundingID, uint256 amount) external payable {
-		require(msg.value == amount, "wrong amount of ETH for deposit");
-		holdings[fundingID] = holdings[fundingID].add(amount);
-		emit Deposited(fundingID, amount);
-	}
+    // Deposit is used to deposit money into a channel
+    // The parameter fundingID = H(channelID||address)
+    // This hides both the channelID as well as the participant address until a channel is settled.
+    function deposit(bytes32 fundingID, uint256 amount) external payable {
+        require(msg.value == amount, "wrong amount of ETH for deposit");
+        holdings[fundingID] = holdings[fundingID].add(amount);
+        emit Deposited(fundingID, amount);
+    }
 
-	function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public {
-		require(settled[authorization.channelID], "channel not settled");
-		require(verifySignature(abi.encode(authorization), signature, authorization.participant), "signature verification failed");
-		bytes32 id = calcFundingID(authorization.channelID, authorization.participant);
-		require(holdings[id] >= authorization.amount, "insufficient ETH for withdrawal");
-		// Decrease holdings, then transfer the money.
-		holdings[id] = holdings[id].sub(authorization.amount);
-		authorization.receiver.transfer(authorization.amount);
-	}
+    function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public {
+        require(settled[authorization.channelID], "channel not settled");
+        require(verifySignature(abi.encode(authorization), signature, authorization.participant), "signature verification failed");
+        bytes32 id = calcFundingID(authorization.channelID, authorization.participant);
+        require(holdings[id] >= authorization.amount, "insufficient ETH for withdrawal");
+        // Decrease holdings, then transfer the money.
+        holdings[id] = holdings[id].sub(authorization.amount);
+        authorization.receiver.transfer(authorization.amount);
+    }
 }
