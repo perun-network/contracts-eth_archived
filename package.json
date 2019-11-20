@@ -1,0 +1,34 @@
+{
+  "devDependencies": {
+    "@types/bn.js": "^4.11.4",
+    "@types/chai": "^4.1.7",
+    "@types/mocha": "^5.2.5",
+    "@types/node": "^10.12.19",
+    "bn.js": "^4.11.8",
+    "chai": "^4.2.0",
+    "openzeppelin-solidity": "^2.1.2",
+    "truffle-assertions": "^0.7.2",
+    "typechain": "^0.3.11",
+    "web3": "^1.0.0-beta.43"
+  },
+  "scripts": {
+    "build:contracts": "truffle compile",
+    "build:types": "typechain --target truffle './build/**/*.json'",
+    "fix:truffle-typings": "sed -i -e '0,/import/! s/= import/= typeof import/' node_modules/truffle-typings/index.d.ts",
+    "postbuild:types": "sed -i -e 's/BigNumber/BN/g' -e '/bignumber\\.js/d' types/truffle-contracts/index.d.ts",
+    "build:js": "tsc -p .",
+    "build": "yarn build:contracts &&  yarn build:types && yarn fix:truffle-typings && yarn build:js",
+    "test": "truffle test"
+  },
+  "dependencies": {
+    "eth-gas-reporter": "^0.2.12",
+    "solidity-coverage": "^0.6.7",
+    "truffle": "^5.1.0",
+    "truffle-error": "^0.0.5",
+    "truffle-security": "^1.5.5",
+    "truffle-typings": "^1.0.8",
+    "web3-eth": "^1.2.4",
+    "web3-utils": "^1.2.1"
+  },
+  "version": "0.0.0"
+}
