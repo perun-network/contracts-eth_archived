@@ -13,6 +13,12 @@ export async function sign(data: string, account: string) {
 
 export function ether(x: number): BN { return web3.utils.toWei(web3.utils.toBN(x), "ether"); }
 
+export const hash = web3.utils.soliditySha3
+
+export function sleep(milliseconds: any) {
+   return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 export function asyncWeb3Send(method: string, params: any[], id?: number): Promise<any> {
   let req: any = { jsonrpc: '2.0', method: method, params: params };
   if (id != undefined) req.id = id;
@@ -20,6 +26,10 @@ export function asyncWeb3Send(method: string, params: any[], id?: number): Promi
   return promisify((callback) => {
     (web3.currentProvider as any).send(req, callback)
   })();
+}
+
+export function fundingID(channelID: string, participant: string) {
+  return web3.utils.soliditySha3(channelID, participant);
 }
 
 export function snapshot(name: string, tests: any) {
