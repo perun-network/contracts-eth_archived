@@ -4,8 +4,8 @@
 
 pragma solidity ^0.5.13;
 pragma experimental ABIEncoderV2;
-import "./SafeMath.sol";
-import "./ECDSA.sol";
+import './SafeMath.sol';
+import './ECDSA.sol';
 
 // AssetHolder is an abstract contract that holds the funds for a Perun state channel.
 contract AssetHolder {
