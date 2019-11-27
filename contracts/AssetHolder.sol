@@ -45,10 +45,10 @@ contract AssetHolder {
         bytes32[] calldata subAllocs,
         uint256[] calldata subBalances)
     external onlyAdjudicator {
-        require(parts.length == newBals.length, "participants length should equal balances");
-        require(subAllocs.length == subBalances.length, "length of subAllocs and subBalances should be equal");
-        require(subAllocs.length == 0, "subAllocs currently not implemented");
-        require(settled[channelID] == false, "trying to set already settled channel");
+        require(parts.length == newBals.length, 'participants length should equal balances');
+        require(subAllocs.length == subBalances.length, 'length of subAllocs and subBalances should be equal');
+        require(subAllocs.length == 0, 'subAllocs currently not implemented');
+        require(settled[channelID] == false, 'trying to set already settled channel');
 
         // The channelID itself might already be funded
         uint256 sumHeld = holdings[channelID];
@@ -65,18 +65,10 @@ contract AssetHolder {
             sumOutcome = sumOutcome.add(newBals[i]);
         }
 
-        for (uint256 i = 0; i < subAllocs.length; i++) {
-            sumOutcome = sumOutcome.add(subBalances[i]);
-        }
-
         // We allow overfunding channels, who overfunds looses their funds.
         if (sumHeld >= sumOutcome) {
             for (uint256 i = 0; i < parts.length; i++) {
                 holdings[fundingIDs[i]] = newBals[i];
-            }
-            for (uint256 i = 0; i < subAllocs.length; i++) {
-                // use add to prevent overwriting of other funds.
-                holdings[subAllocs[i]] = holdings[subAllocs[i]].add(subBalances[i]);
             }
         }
         settled[channelID] = true;
