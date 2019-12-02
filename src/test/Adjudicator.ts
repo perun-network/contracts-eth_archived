@@ -97,7 +97,7 @@ class Allocation {
   }
 
   encode() {
-    var _locked = this.locked[0].encode();
+    var _locked = "0x";
     return web3.eth.abi.encodeParameters(
       ['address[]', 'uint256[][]', 'bytes'],
       [this.assets, this.balances, _locked]);
@@ -151,8 +151,7 @@ contract("Adjudicator", async (accounts) => {
     let params = new Params(app, timeout, nonce, [parts[A], parts[B]]);
     // calculate channelID wrong:
     let channelID = hash("asdf");
-    let suballoc = new SubAlloc(accounts[0], ["0x00"]);
-    let outcome = new Allocation([asset], [[ether(1).toString(), ether(1).toString()]], [suballoc]);
+    let outcome = new Allocation([asset], [[ether(1).toString(), ether(1).toString()]], []);
     let state = new State(channelID, "0", outcome, "0x00", false);
     let stateHash = hash(state.encode());
     let sigs = [await sign(state.encode(), parts[A]), await sign(state.encode(), parts[B])];
@@ -263,8 +262,7 @@ contract("Adjudicator", async (accounts) => {
   it("refuting with wrong channelID fails", async () => {
     let params = new Params(app, timeout, nonce, [parts[A], parts[B]]);
     let channelID = hash("asdf");
-    let suballoc = new SubAlloc(accounts[0], ["0x00"]);
-    let outcome = new Allocation([asset], [[ether(1).toString(), ether(1).toString()]], [suballoc]);
+    let outcome = new Allocation([asset], [[ether(1).toString(), ether(1).toString()]], []);
     let state = new State(channelID, "5", outcome, "0x00", false);
     let stateHash = hash(state.encode());
     let sigs = [await sign(state.encode(), parts[A]), await sign(state.encode(), parts[B])];

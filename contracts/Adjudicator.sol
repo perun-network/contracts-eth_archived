@@ -206,11 +206,8 @@ contract Adjudicator {
                 sumOld = sumOld.add(oldAlloc.balances[i][k]);
                 sumNew = sumNew.add(newAlloc.balances[i][k]);
             }
-            // Add the sums of all subAllocs
-            for (uint256 k = 0; k < oldAlloc.locked.length; k++) {
-                sumOld = sumOld.add(oldAlloc.locked[k].balances[i]);
-                sumNew = sumNew.add(newAlloc.locked[k].balances[i]);
-            }
+            require(oldAlloc.locked.length == 0, "subAllocs currently not implemented");
+            require(newAlloc.locked.length == 0, "subAllocs currently not implemented");
             require(sumOld == sumNew, 'Sum of balances for an asset must be equal');
         }
     }
@@ -224,18 +221,6 @@ contract Adjudicator {
     {
         uint256[][] memory balances = new uint256[][](state.outcome.assets.length);
         bytes32[] memory subAllocs = new bytes32[](state.outcome.locked.length);
-        // Iterate over all subAllocations
-        for(uint256 k = 0; k < state.outcome.locked.length; k++) {
-            subAllocs[k] = state.outcome.locked[k].ID;
-            // Iterate over all Assets
-            for(uint256 i = 0; i < state.outcome.assets.length; i++) {
-                // init subarrays
-                if (k == 0)
-                    balances[i] = new uint256[](state.outcome.locked.length);
-                balances[i][k] = balances[i][k].add(state.outcome.locked[k].balances[i]);
-            }
-        }
-
         for (uint256 i = 0; i < state.outcome.assets.length; i++) {
             AssetHolder a = AssetHolder(state.outcome.assets[i]);
             require(state.outcome.balances[i].length == params.participants.length, "balances length should match participants length");
@@ -262,7 +247,7 @@ contract Adjudicator {
         bytes memory sig)
     internal pure returns (address)
     {
-        bytes memory subAlloc = abi.encode(state.outcome.locked[0].ID, state.outcome.locked[0].balances);
+        bytes memory subAlloc = "";
         bytes memory outcome = abi.encode(state.outcome.assets, state.outcome.balances, subAlloc);
         bytes memory state = abi.encode(state.channelID, state.version, outcome, state.appData, state.isFinal);
         bytes32 prefixedHash = ECDSA.toEthSignedMessageHash(keccak256(state));
