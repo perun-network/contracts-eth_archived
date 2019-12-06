@@ -9,7 +9,7 @@ import "./Channel.sol";
 import "./App.sol";
 import "./AssetHolder.sol";
 import "./SafeMath.sol";
-import "./ECDSA.sol";
+import "./Sig.sol";
 
 contract Adjudicator {
 
@@ -17,13 +17,13 @@ contract Adjudicator {
 
     enum DisputePhase { DISPUTE, FORCEEXEC }
 
-    // Mapping channelID => H(parameters, state, timeout).
+    // Mapping channelID => H(parameters, state, timeout, disputephase).
     mapping(bytes32 => bytes32) public disputes;
 
     // Events used by the contract.
     event Registered(bytes32 indexed channelID, uint256 version);
     event Refuted(bytes32 indexed channelID, uint256 version);
-    event Responded(bytes32 indexed channelID, uint256 version);
+    event Progressed(bytes32 indexed channelID, uint256 version);
     event Stored(bytes32 indexed channelID, uint256 timeout);
     event FinalConcluded(bytes32 indexed channelID);
     event Concluded(bytes32 indexed channelID);
@@ -84,10 +84,10 @@ contract Adjudicator {
     }
 
     // Progress is used to advance the state of an app on-chain.
-    // It corresponds to the force-move functionality of magmo.
-    // The caller only has to provide a valid signature from the mover.
-    // This method can only advance the state by one.
-    // If the call was successful, a Responded event is emitted.
+    // The caller has to provide a valid signature from the actor.
+    // It is checked whether the new state is a valid transition from the old state,
+    // so this method can only advance the state by one step.
+    // If the call was successful, a Progressed event is emitted.
     function progress(
         Channel.Params memory params,
         Channel.State memory stateOld,
@@ -103,19 +103,19 @@ contract Adjudicator {
         }
         require(actorIdx < params.participants.length, "actorIdx out of range");
         bytes32 channelID = calcChannelID(params);
-        require(state.channelID == channelID, "tried to respond with invalid channelID");
-        require(disputes[channelID] == hashDispute(params, stateOld, timeout, disputePhase), "provided wrong old state or timeout");
-        address signer = recoverSigner(state, sig);
-        require(params.participants[actorIdx] == signer, "actorIdx is not set to the id of the sender");
+        require(state.channelID == channelID, "tried progressing with invalid channelID");
+        require(disputes[channelID] == hashDispute(params, stateOld, timeout, disputePhase),
+            "provided wrong old state or timeout");
+        require(Sig.verify(Channel.encodeState(state), sig,params.participants[actorIdx]), "actorIdx is not set to the id of the sender");
         requireValidTransition(params, stateOld, state, actorIdx);
         storeChallenge(params, state, channelID, DisputePhase.FORCEEXEC);
-        emit Responded(channelID, state.version);
+        emit Progressed(channelID, state.version);
     }
 
-    // ConcludeChallenge is used to finalize a channel on-chain.
+    // Conclude is used to finalize a channel on-chain.
     // It can only be called after the timeout is over.
     // If the call was successful, a Concluded event is emitted.
-    function concludeChallenge(
+    function conclude(
         Channel.Params memory params,
         Channel.State memory state,
         uint256 timeout,
@@ -128,10 +128,11 @@ contract Adjudicator {
         emit Concluded(channelID);
     }
 
-    // ConcludeFinal can be used to register a final state.
-    // The caller has to provide n signatures on a finalized state.
-    // It can only be called, if no other dispute was registered.
-    // If the call was successful, a FinalConcluded event is emitted.
+    // ConcludeFinal can be used to immediately conclude a final state
+    // without registering it or waiting for a timeout.
+    // The caller has to provide n signatures on the final state.
+    // It can only be called if no other dispute for this channel was registered.
+    // If the call was successful, a FinalConcluded and Concluded event is emitted.
     function concludeFinal(
         Channel.Params memory params,
         Channel.State memory state,
@@ -159,6 +160,8 @@ contract Adjudicator {
         DisputePhase disputePhase)
     internal
     {
+        // We require empty subAllocs because they are not implemented yet.
+        require(state.outcome.locked.length == 0);
         uint256 timeout = now.add(params.challengeDuration);
         disputes[channelID] = hashDispute(params, state, timeout, disputePhase);
         emit Stored(channelID, timeout);
@@ -212,7 +215,6 @@ contract Adjudicator {
         }
     }
 
-
     function pushOutcome(
         bytes32 channelID,
         Channel.Params memory params,
@@ -224,6 +226,7 @@ contract Adjudicator {
         for (uint256 i = 0; i < state.outcome.assets.length; i++) {
             AssetHolder a = AssetHolder(state.outcome.assets[i]);
             require(state.outcome.balances[i].length == params.participants.length, "balances length should match participants length");
+            // We set empty subAllocs because they are not implemented yet.
             a.setOutcome(channelID, params.participants, state.outcome.balances[i], subAllocs, balances[i]);
         }
         emit PushOutcome(channelID);
@@ -235,25 +238,10 @@ contract Adjudicator {
         bytes[] memory sigs)
     internal pure
     {
+        bytes memory encodedState = Channel.encodeState(state);
         require(params.participants.length == sigs.length, "invalid length of signatures");
         for (uint256 i = 0; i < sigs.length; i++) {
-            address signer = recoverSigner(state, sigs[i]);
-            require(params.participants[i] == signer, "invalid signature");
+            require(Sig.verify(encodedState, sigs[i], params.participants[i]), "invalid signature");
         }
     }
-
-    function recoverSigner(
-        Channel.State memory state,
-        bytes memory sig)
-    internal pure returns (address)
-    {
-        bytes memory subAlloc = "";
-        bytes memory outcome = abi.encode(state.outcome.assets, state.outcome.balances, subAlloc);
-        bytes memory state = abi.encode(state.channelID, state.version, outcome, state.appData, state.isFinal);
-        bytes32 prefixedHash = ECDSA.toEthSignedMessageHash(keccak256(state));
-        address recoveredAddr = ECDSA.recover(prefixedHash, sig);
-        require(recoveredAddr != address(0), "recovered invalid signature");
-        return recoveredAddr;
-    }
-
 }
