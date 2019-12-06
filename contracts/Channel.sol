@@ -24,6 +24,7 @@ library Channel {
 
     struct Allocation {
         address[] assets;
+        // Outer dimension are assets, inner dimension are the participants.
         uint256[][] balances;
         SubAlloc[] locked;
     }
@@ -35,4 +36,10 @@ library Channel {
         uint256[] balances;
     }
 
+    function encodeState(State memory state) internal pure returns (bytes memory)  {
+        bytes memory subAlloc = "";
+        bytes memory outcome = abi.encode(state.outcome.assets, state.outcome.balances, subAlloc);
+        bytes memory stateEnc = abi.encode(state.channelID, state.version, outcome, state.appData, state.isFinal);
+        return stateEnc;
+    }
 }

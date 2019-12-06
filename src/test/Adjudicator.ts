@@ -29,7 +29,11 @@ class Params {
   }
 
   serialize() {
-    return { app: this.app, challengeDuration: this.challengeDuration, nonce: this.nonce, participants: this.parts };
+    return {
+      app: this.app,
+      challengeDuration: this.challengeDuration,
+      nonce: this.nonce,
+      participants: this.parts };
   }
 
   encode() {
@@ -63,8 +67,11 @@ class State {
 
   serialize() {
     return {
-      channelID: this.channelID, version: this.version,
-      outcome: this.outcome.serialize(), appData: this.appData, isFinal: this.isFinal
+      channelID: this.channelID,
+      version: this.version,
+      outcome: this.outcome.serialize(),
+      appData: this.appData,
+      isFinal: this.isFinal
     }
   }
 
@@ -533,7 +540,7 @@ contract("Adjudicator", async (accounts) => {
     let params = new Params(app, "1", "0xDEADBEEF", [parts[A], parts[B]]);
     let channelID = params.channelID();
     truffleAssert.eventEmitted(
-      await adj.concludeChallenge(
+      await adj.conclude(
         params.serialize(),
         validState.serialize(),
         validStateTimeout,
