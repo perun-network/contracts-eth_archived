@@ -4,8 +4,9 @@
 
 pragma solidity ^0.5.11;
 pragma experimental ABIEncoderV2;
-import './AssetHolder.sol';
-import './SafeMath.sol';
+import "./AssetHolder.sol";
+import "./SafeMath.sol";
+import "./Sig.sol";
 
 contract AssetHolderETH is AssetHolder {
 
@@ -26,7 +27,7 @@ contract AssetHolderETH is AssetHolder {
 
     function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public {
         require(settled[authorization.channelID], "channel not settled");
-        require(verifySignature(abi.encode(authorization), signature, authorization.participant), "signature verification failed");
+        require(Sig.verify(abi.encode(authorization), signature, authorization.participant), "signature verification failed");
         bytes32 id = calcFundingID(authorization.channelID, authorization.participant);
         require(holdings[id] >= authorization.amount, "insufficient ETH for withdrawal");
         // Decrease holdings, then transfer the money.

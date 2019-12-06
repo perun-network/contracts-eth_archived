@@ -4,8 +4,7 @@
 
 pragma solidity ^0.5.13;
 pragma experimental ABIEncoderV2;
-import './SafeMath.sol';
-import './ECDSA.sol';
+import "./SafeMath.sol";
 
 // AssetHolder is an abstract contract that holds the funds for a Perun state channel.
 contract AssetHolder {
@@ -45,10 +44,10 @@ contract AssetHolder {
         bytes32[] calldata subAllocs,
         uint256[] calldata subBalances)
     external onlyAdjudicator {
-        require(parts.length == newBals.length, 'participants length should equal balances');
-        require(subAllocs.length == subBalances.length, 'length of subAllocs and subBalances should be equal');
-        require(subAllocs.length == 0, 'subAllocs currently not implemented');
-        require(settled[channelID] == false, 'trying to set already settled channel');
+        require(parts.length == newBals.length, "participants length should equal balances");
+        require(subAllocs.length == subBalances.length, "length of subAllocs and subBalances should be equal");
+        require(subAllocs.length == 0, "subAllocs currently not implemented");
+        require(settled[channelID] == false, "trying to set already settled channel");
 
         // The channelID itself might already be funded
         uint256 sumHeld = holdings[channelID];
@@ -73,14 +72,6 @@ contract AssetHolder {
         }
         settled[channelID] = true;
         emit OutcomeSet(channelID);
-    }
-
-    // VerifySignature verifies whether a piece of data was signed correctly.
-    function verifySignature(bytes memory data, bytes memory signature, address signer) internal pure returns (bool) {
-        bytes32 prefixedHash = ECDSA.toEthSignedMessageHash(keccak256(data));
-        address recoveredAddr = ECDSA.recover(prefixedHash, signature);
-        require(recoveredAddr != address(0));
-        return recoveredAddr == signer;
     }
 
     function calcFundingID(bytes32 channelID, address participant) internal pure returns (bytes32) {
