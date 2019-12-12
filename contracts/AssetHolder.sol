@@ -28,7 +28,7 @@ contract AssetHolder {
     // Mapping channelID => settled
     mapping(bytes32 => bool) public settled;
 
-    address public adjudicator;
+    address public adjudicator = address(0);
 
     modifier onlyAdjudicator {
         require(msg.sender == adjudicator,
