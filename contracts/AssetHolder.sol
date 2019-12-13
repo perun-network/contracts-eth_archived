@@ -6,13 +6,18 @@ pragma solidity ^0.5.13;
 pragma experimental ABIEncoderV2;
 import "./SafeMath.sol";
 
-// AssetHolder is an abstract contract that holds the funds for a Perun state channel.
+/**
+ * @title The Perun AssetHolder
+ * @author The Perun Authors
+ * @dev AssetHolder is an abstract contract that holds the funds for a Perun state channel.
+ */
 contract AssetHolder {
 
     using SafeMath for uint256;
 
-    // WithdrawalAuthorization authorizes a on-chain public key to withdraw
-    // from an ephemeral key.
+    /**
+     * @dev WithdrawalAuthorization authorizes a on-chain public key to withdraw from an ephemeral key.
+     */
     struct WithdrawalAuth {
         bytes32 channelID;
         address participant; // The account used to sign the authorization which is debited.
@@ -23,20 +28,42 @@ contract AssetHolder {
     event OutcomeSet(bytes32 indexed channelID);
     event Deposited(bytes32 indexed fundingID, uint256 amount);
 
-    // Mapping H(channelID||participant) => money
+    /**
+     * @notice This mapping stores the balances of participants to their fundingID.
+     * @dev Mapping H(channelID||participant) => money
+     */
     mapping(bytes32 => uint256) public holdings;
-    // Mapping channelID => settled
+
+    /**
+     * @notice This mapping stores whether a channel was already settled.
+     * @dev Mapping channelID => settled
+     */
     mapping(bytes32 => bool) public settled;
 
+    /**
+     * @notice adjudicator stores the address of the adjudicator contract that can call setOutcome().
+     * @dev This should only be set in the constructor of the implementing contract.
+     */
     address public adjudicator = address(0);
 
+    /**
+     * @notice The onlyAdjudicator modifier specifies functions that can only be called from the adjudicator contract.
+     */
     modifier onlyAdjudicator {
         require(msg.sender == adjudicator,
             "This method can only be called by the adjudicator contract");
         _;
     }
 
-    // SetOutcome is called by the Adjudicator to set the final outcome of a channel.
+    /**
+     * @notice Sets the final outcome of a channel, can only be called by the adjudicator.
+     * @dev this method should not be overwritten by the implementing contract.
+     * @param channelID ID of the channel that should be disbursed.
+     * @param parts Array of participants of the channel.
+     * @param newBals New Balances after execution of the channel.
+     * @param subAllocs currently not implemented.
+     * @param subBalances currently not implemented.
+     */
     function setOutcome(
         bytes32 channelID,
         address[] calldata parts,
@@ -74,10 +101,29 @@ contract AssetHolder {
         emit OutcomeSet(channelID);
     }
 
+    /**
+     * @notice Internal helper function that calculates the fundingID.
+     * @param channelID Unique identifier of a channel.
+     * @param participant Address of a participant in the channel.
+     * @return fundingID = H(channelID || participant)
+     */
     function calcFundingID(bytes32 channelID, address participant) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(channelID, participant));
     }
 
+    /**
+     * @notice Payable function that is used to fund a channel.
+     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
+     * @param fundingID Unique identifier for a participant in a channel.
+     * @param amount Amount of money that should be deposited.
+     */
     function deposit(bytes32 fundingID, uint256 amount) external payable;
+
+    /**
+     * @notice Sends money from authorization.participant to authorization.receiver
+     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
+     * @param authorization WithdrawalAuth struct that is used to send money from an ephemeral key to an on-chain key.
+     * @param signature Signature on the withdrawal authorization
+     */
     function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public;
 }
