@@ -57,7 +57,7 @@ contract AssetHolder {
 
     /**
      * @notice Sets the final outcome of a channel, can only be called by the adjudicator.
-     * @dev this method should not be overwritten by the implementing contract.
+     * @dev This method should not be overwritten by the implementing contract.
      * @param channelID ID of the channel that should be disbursed.
      * @param parts Array of participants of the channel.
      * @param newBals New Balances after execution of the channel.
@@ -105,14 +105,14 @@ contract AssetHolder {
      * @notice Internal helper function that calculates the fundingID.
      * @param channelID Unique identifier of a channel.
      * @param participant Address of a participant in the channel.
-     * @return fundingID = H(channelID || participant)
+     * @return The funding ID, an identifier used for indexing.
      */
     function calcFundingID(bytes32 channelID, address participant) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(channelID, participant));
     }
 
     /**
-     * @notice Payable function that is used to fund a channel.
+     * @notice Function that is used to fund a channel.
      * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
      * @param fundingID Unique identifier for a participant in a channel.
      * @param amount Amount of money that should be deposited.
