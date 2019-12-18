@@ -1,6 +1,7 @@
-// Copyright (c) 2019 The Perun Authors. All rights reserved.
-// This file is part of go-perun. Use of this source code is governed by a
-// MIT-style license that can be found in the LICENSE file.
+// Copyright (c) 2019 Chair of Applied Cryptography, Technische Universität
+// Darmstadt, Germany. All rights reserved. This file is part of go-perun. Use
+// of this source code is governed by a MIT-style license that can be found in
+// the LICENSE file.
 
 pragma solidity ^0.5.13;
 pragma experimental ABIEncoderV2;
@@ -16,7 +17,7 @@ contract AssetHolder {
     using SafeMath for uint256;
 
     /**
-     * @dev WithdrawalAuthorization authorizes a on-chain public key to withdraw from an ephemeral key.
+     * @dev WithdrawalAuth authorizes an on-chain public key to withdraw from an ephemeral key.
      */
     struct WithdrawalAuth {
         bytes32 channelID;
@@ -103,7 +104,7 @@ contract AssetHolder {
 
     /**
      * @notice Internal helper function that calculates the fundingID.
-     * @param channelID Unique identifier of a channel.
+     * @param channelID ID of the channel.
      * @param participant Address of a participant in the channel.
      * @return The funding ID, an identifier used for indexing.
      */
@@ -120,10 +121,10 @@ contract AssetHolder {
     function deposit(bytes32 fundingID, uint256 amount) external payable;
 
     /**
-     * @notice Sends money from authorization.participant to authorization.receiver
+     * @notice Sends money from authorization.participant to authorization.receiver.
      * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
      * @param authorization WithdrawalAuth struct that is used to send money from an ephemeral key to an on-chain key.
-     * @param signature Signature on the withdrawal authorization
+     * @param signature Signature on the withdrawal authorization.
      */
     function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public;
 }
