@@ -1,6 +1,7 @@
-// Copyright (c) 2019 The Perun Authors. All rights reserved.
-// This file is part of go-perun. Use of this source code is governed by a
-// MIT-style license that can be found in the LICENSE file.
+// Copyright (c) 2019 Chair of Applied Cryptography, Technische Universität
+// Darmstadt, Germany. All rights reserved. This file is part of go-perun. Use
+// of this source code is governed by a MIT-style license that can be found in
+// the LICENSE file.
 
 pragma solidity ^0.5.13;
 pragma experimental ABIEncoderV2;
@@ -11,16 +12,27 @@ import "./AssetHolder.sol";
 import "./SafeMath.sol";
 import "./Sig.sol";
 
+/**
+ * @title The Perun Adjudicator
+ * @author The Perun Authors
+ * @dev Adjudicator is the contract that decides on the current state of a statechannel.
+ */
 contract Adjudicator {
 
     using SafeMath for uint256;
 
+    /**
+     * @dev Our state machine has two phases.
+     * In the DISPUTE phase, all parties have the ability to publish their latest state.
+     * In the FORCEEXEC phase, the smart contract is executed on-chain.
+     */
     enum DisputePhase { DISPUTE, FORCEEXEC }
 
-    // Mapping channelID => H(state, timeout, disputephase).
+    /**
+     * @dev Mapping channelID => H(state, timeout, disputephase).
+     */
     mapping(bytes32 => bytes32) public disputes;
 
-    // Events used by the contract.
     event Registered(bytes32 indexed channelID, uint256 version);
     event Refuted(bytes32 indexed channelID, uint256 version);
     event Progressed(bytes32 indexed channelID, uint256 version);
@@ -29,24 +41,35 @@ contract Adjudicator {
     event Concluded(bytes32 indexed channelID);
     event PushOutcome(bytes32 indexed channelID);
 
-    // Restricts functions to only be called before a certain timeout.
+    /**
+     * @dev Restricts functions to only be called before a certain timeout.
+     */
     modifier beforeTimeout(uint256 timeout)
     {
         require(now < timeout, "function called after timeout");
         _;
     }
 
-    // Restricts functions to only be called after a certain timeout.
+    /**
+     * @dev Restricts functions to only be called after a certain timeout.
+     */
     modifier afterTimeout(uint256 timeout)
     {
         require(now >= timeout, "function called before timeout");
         _;
     }
 
-    // Register registers a non-final state of a channel.
-    // It can only be called if no other dispute is currently in progress.
-    // The caller has to provide n signatures on the state.
-    // If the call was sucessful a Registered event is emitted.
+    /**
+     * @notice Register registers a non-final state of a channel.
+     * If the call was sucessful a Registered event is emitted.
+     *
+     * @dev It can only be called if no other dispute is currently in progress.
+     * The caller has to provide n signatures on the state.
+     *
+     * @param params The parameters of the state channel.
+     * @param state The current state of the state channel.
+     * @param sigs Array of n signatures on the current state.
+     */
     function register(
         Channel.Params memory params,
         Channel.State memory state,
@@ -61,10 +84,19 @@ contract Adjudicator {
         emit Registered(channelID, state.version);
     }
 
-    // Refute is called to refute a dispute.
-    // It can only be called with a higher state.
-    // The caller has to provide n signatures on the new state.
-    // If the call was sucessful a Refuted event is emitted.
+    /**
+     * @notice Refute is called to refute a dispute.
+     * If the call was sucessful a Refuted event is emitted.
+     *
+     * @dev Refute can only be called with a higher version state.
+     * The caller has to provide n signatures on the new state.
+     *
+     * @param params The parameters of the state channel.
+     * @param stateOld The previously stored state of the state channel.
+     * @param timeout The previously stored timeout.
+     * @param state The current state of the state channel.
+     * @param sigs Array of n signatures on the current state.
+     */
     function refute(
         Channel.Params memory params,
         Channel.State memory stateOld,
@@ -83,11 +115,22 @@ contract Adjudicator {
         emit Refuted(channelID, state.version);
     }
 
-    // Progress is used to advance the state of an app on-chain.
-    // The caller has to provide a valid signature from the actor.
-    // It is checked whether the new state is a valid transition from the old state,
-    // so this method can only advance the state by one step.
-    // If the call was successful, a Progressed event is emitted.
+    /**
+     * @notice Progress is used to advance the state of an app on-chain.
+     * If the call was successful, a Progressed event is emitted.
+     *
+     * @dev The caller has to provide a valid signature from the actor.
+     * It is checked whether the new state is a valid transition from the old state,
+     * so this method can only advance the state by one step.
+     *
+     * @param params The parameters of the state channel.
+     * @param stateOld The previously stored state of the state channel.
+     * @param timeout The previously stored timeout.
+     * @param disputePhase The phase in which the last stored state was.
+     * @param state The new state to which we want to progress.
+     * @param actorIdx Index of the signer in the participants array.
+     * @param sig Signature of the participant that wants to progress the contract on the new state.
+     */
     function progress(
         Channel.Params memory params,
         Channel.State memory stateOld,
@@ -111,10 +154,16 @@ contract Adjudicator {
         storeChallenge(params, state, channelID, DisputePhase.FORCEEXEC);
         emit Progressed(channelID, state.version);
     }
-
-    // Conclude is used to finalize a channel on-chain.
-    // It can only be called after the timeout is over.
-    // If the call was successful, a Concluded event is emitted.
+    /**
+     * @notice Conclude is used to finalize a channel on-chain.
+     * It can only be called after the timeout is over.
+     * If the call was successful, a Concluded event is emitted.
+     *
+     * @param params The parameters of the state channel.
+     * @param state The previously stored state of the state channel.
+     * @param timeout The previously stored timeout.
+     * @param disputePhase The phase in which the last stored state was.
+     */
     function conclude(
         Channel.Params memory params,
         Channel.State memory state,
@@ -128,11 +177,18 @@ contract Adjudicator {
         emit Concluded(channelID);
     }
 
-    // ConcludeFinal can be used to immediately conclude a final state
-    // without registering it or waiting for a timeout.
-    // The caller has to provide n signatures on the final state.
-    // It can only be called if no other dispute for this channel was registered.
-    // If the call was successful, a FinalConcluded and Concluded event is emitted.
+    /**
+     * @notice ConcludeFinal can be used to immediately conclude a final state
+     * without registering it or waiting for a timeout.
+     * If the call was successful, a FinalConcluded and Concluded event is emitted.
+     *
+     * @dev The caller has to provide n signatures on the final state.
+     * It can only be called if no other dispute for this channel was registered.
+     *
+     * @param params The parameters of the state channel.
+     * @param state The current state of the state channel.
+     * @param sigs Array of n signatures on the current state.
+     */
     function concludeFinal(
         Channel.Params memory params,
         Channel.State memory state,
@@ -149,10 +205,22 @@ contract Adjudicator {
         emit Concluded(channelID);
     }
 
+    /**
+     * @notice Calculates the channelID of the state channel.
+     * @param params The parameter of the channel.
+     * @return The channelID
+     */
     function calcChannelID(Channel.Params memory params) internal pure returns (bytes32) {
         return keccak256(abi.encode(params.challengeDuration, params.nonce, params.app, params.participants));
     }
 
+    /**
+     * @dev Stores the provided challenge in the dipute registry
+     * @param params The parameters of the state channel.
+     * @param state The current state of the state channel.
+     * @param channelID The channelID of the state channel.
+     * @param disputePhase The phase in which the state channel is currently.
+     */
     function storeChallenge(
         Channel.Params memory params,
         Channel.State memory state,
@@ -167,6 +235,12 @@ contract Adjudicator {
         emit Stored(channelID, timeout);
     }
 
+    /**
+     * @dev Hashes a dispute to save gas.
+     * @param state The state of the state channel.
+     * @param timeout The timeout that should be hashed.
+     * @param disputePhase The phase in which the state is.
+     */
     function hashDispute(
         Channel.State memory state,
         uint256 timeout,
@@ -176,6 +250,15 @@ contract Adjudicator {
         return keccak256(abi.encode(state, timeout, uint256(disputePhase)));
     }
 
+    /**
+     * @dev Checks if a transition between two states is valid.
+     * This calls the validTransition() function of the app.
+     *
+     * @param params The parameters of the state channel.
+     * @param from The previous state of the state channel.
+     * @param to The new state of the state channel.
+     * @param actorIdx Index of the signer in the participants array.
+     */
     function requireValidTransition(
         Channel.Params memory params,
         Channel.State memory from,
@@ -190,6 +273,12 @@ contract Adjudicator {
         require(app.validTransition(params, from, to, actorIdx), "invalid new state");
     }
 
+    /**
+     * @dev Checks if two allocations are compatible, e.g. if the sums of the allocations are equal.
+     * @param oldAlloc The old allocation.
+     * @param newAlloc The new allocation.
+     * @param numParts length of the participants in the parameters.
+     */
     function requireAssetPreservation(
         Channel.Allocation memory oldAlloc,
         Channel.Allocation memory newAlloc,
@@ -214,6 +303,12 @@ contract Adjudicator {
         }
     }
 
+    /**
+     * @notice Sets the outcome on all assetholder contracts.
+     * @param channelID The unique identifier of the channel.
+     * @param params The parameters of the state channel.
+     * @param state The current state of the state channel.
+     */
     function pushOutcome(
         bytes32 channelID,
         Channel.Params memory params,
@@ -231,6 +326,12 @@ contract Adjudicator {
         emit PushOutcome(channelID);
     }
 
+    /**
+     * @dev checks that we have n valid signatures on a state.
+     * @param params The parameters corresponding to the state.
+     * @param state The state of the state channel.
+     * @param sigs An array of n signatures corresponding to the n participants of the channel.
+     */
     function validateSignatures(
         Channel.Params memory params,
         Channel.State memory state,
