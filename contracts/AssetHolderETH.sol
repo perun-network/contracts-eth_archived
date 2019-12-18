@@ -1,6 +1,7 @@
-// Copyright (c) 2019 The Perun Authors. All rights reserved.
-// This file is part of go-perun. Use of this source code is governed by a
-// MIT-style license that can be found in the LICENSE file.
+// Copyright (c) 2019 Chair of Applied Cryptography, Technische Universität
+// Darmstadt, Germany. All rights reserved. This file is part of go-perun. Use
+// of this source code is governed by a MIT-style license that can be found in
+// the LICENSE file.
 
 pragma solidity ^0.5.11;
 pragma experimental ABIEncoderV2;
@@ -26,7 +27,7 @@ contract AssetHolderETH is AssetHolder {
     }
 
     /**
-     * @notice Used to deposit money into a channel
+     * @notice Used to deposit money into a channel.
      * @dev Using the fundingID like this hides both the channelID as well as the participant address until a channel is settled.
      * @param fundingID Unique identifier for a participant in a channel.
      * @param amount Amount of money that should be deposited.
@@ -38,8 +39,7 @@ contract AssetHolderETH is AssetHolder {
     }
 
     /**
-     * @notice Sends money from authorization.participant to authorization.receiver
-     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
+     * @notice Sends money from authorization.participant to authorization.receiver.
      * @param authorization WithdrawalAuth struct that is used to send money from an ephemeral key to an on-chain key.
      * @param signature Signature on the withdrawal authorization
      */
