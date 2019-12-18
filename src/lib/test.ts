@@ -1,3 +1,8 @@
+// Copyright (c) 2019 Chair of Applied Cryptography, Technische Universität
+// Darmstadt, Germany. All rights reserved. This file is part of go-perun. Use
+// of this source code is governed by a MIT-style license that can be found in
+// the LICENSE file.
+
 /// <reference types="truffle-typings" />
 import Web3 from "web3";
 var web3 = new Web3(Web3.givenProvider || 'http://127.0.0.1:7545/');

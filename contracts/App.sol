@@ -9,6 +9,20 @@ import "./Channel.sol";
 
 interface App {
 
+    /**
+     * @notice ValidTransition checks if there was a valid transition between two states.
+     * @dev ValidTransition should revert on an invalid transition.
+     * Only App specific checks should be performed.
+     * The adjudicator already checks the following:
+     * - state corresponds to the params
+     * - correct dimensions of the allocation
+     * - preservation of balances
+     * - params.participants[actorIdx] signed the to state
+     * @param params The parameters of the channel.
+     * @param from The current state.
+     * @param to The potenrial next state.
+     * @param actorIdx Index of the actor who signed this transition.
+     */
     function validTransition(
         Channel.Params calldata params,
         Channel.State calldata from,
