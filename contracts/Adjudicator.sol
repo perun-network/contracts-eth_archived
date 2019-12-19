@@ -270,7 +270,7 @@ contract Adjudicator {
         require(from.isFinal == false, "cannot advance from final state");
         requireAssetPreservation(from.outcome, to.outcome, params.participants.length);
         App app = App(params.app);
-        require(app.validTransition(params, from, to, actorIdx), "invalid new state");
+        app.validTransition(params, from, to, actorIdx);
     }
 
     /**
