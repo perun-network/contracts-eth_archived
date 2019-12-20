@@ -1,3 +1,8 @@
+// Copyright (c) 2019 Chair of Applied Cryptography, Technische Universität
+// Darmstadt, Germany. All rights reserved. This file is part of go-perun. Use
+// of this source code is governed by a MIT-style license that can be found in
+// the LICENSE file.
+
 /// <reference types="truffle-typings" />
 import Web3 from "web3";
 var web3 = new Web3(Web3.givenProvider || 'http://127.0.0.1:7545/');
@@ -13,6 +18,12 @@ export async function sign(data: string, account: string) {
 
 export function ether(x: number): BN { return web3.utils.toWei(web3.utils.toBN(x), "ether"); }
 
+export const hash = web3.utils.soliditySha3
+
+export function sleep(milliseconds: any) {
+   return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 export function asyncWeb3Send(method: string, params: any[], id?: number): Promise<any> {
   let req: any = { jsonrpc: '2.0', method: method, params: params };
   if (id != undefined) req.id = id;
@@ -20,6 +31,10 @@ export function asyncWeb3Send(method: string, params: any[], id?: number): Promi
   return promisify((callback) => {
     (web3.currentProvider as any).send(req, callback)
   })();
+}
+
+export function fundingID(channelID: string, participant: string) {
+  return web3.utils.soliditySha3(channelID, participant);
 }
 
 export function snapshot(name: string, tests: any) {
