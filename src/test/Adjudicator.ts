@@ -245,7 +245,6 @@ contract("Adjudicator", async (accounts) => {
     await truffleAssert.reverts(
       adj.refute(
         params.serialize(),
-        validState.serialize(),
         validStateTimeout,
         state.serialize(),
         sigs,
@@ -263,7 +262,6 @@ contract("Adjudicator", async (accounts) => {
     await truffleAssert.reverts(
       adj.refute(
         params.serialize(),
-        validState.serialize(),
         validStateTimeout + "1",
         state.serialize(),
         sigs,
@@ -281,7 +279,6 @@ contract("Adjudicator", async (accounts) => {
     await truffleAssert.reverts(
       adj.refute(
         params.serialize(),
-        validState.serialize(),
         validStateTimeout,
         state.serialize(),
         sigs,
@@ -299,7 +296,6 @@ contract("Adjudicator", async (accounts) => {
     await truffleAssert.reverts(
       adj.refute(
         params.serialize(),
-        validState.serialize(),
         validStateTimeout,
         state.serialize(),
         sigs,
@@ -317,7 +313,6 @@ contract("Adjudicator", async (accounts) => {
     truffleAssert.eventEmitted(
       await adj.refute(
         params.serialize(),
-        validState.serialize(),
         validStateTimeout,
         state.serialize(),
         sigs,
