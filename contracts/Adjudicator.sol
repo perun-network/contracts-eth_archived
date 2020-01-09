@@ -35,7 +35,6 @@ contract Adjudicator {
         bytes32 stateHash;
     }
 
-
     /**
      * @dev Mapping channelID => H(state, timeout, disputephase).
      */
@@ -48,24 +47,6 @@ contract Adjudicator {
     event FinalConcluded(bytes32 indexed channelID);
     event Concluded(bytes32 indexed channelID);
     event PushOutcome(bytes32 indexed channelID);
-
-    /**
-     * @dev Restricts functions to only be called before a certain timeout.
-     */
-    modifier beforeTimeout(uint256 timeout)
-    {
-        require(now < timeout, "function called after timeout");
-        _;
-    }
-
-    /**
-     * @dev Restricts functions to only be called after a certain timeout.
-     */
-    modifier afterTimeout(uint256 timeout)
-    {
-        require(now >= timeout, "function called before timeout");
-        _;
-    }
 
     /**
      * @notice Register registers a non-final state of a channel.
@@ -100,21 +81,19 @@ contract Adjudicator {
      * The caller has to provide n signatures on the new state.
      *
      * @param params The parameters of the state channel.
-     * @param timeout The previously stored timeout.
      * @param state The current state of the state channel.
      * @param sigs Array of n signatures on the current state.
      */
     function refute(
         Channel.Params memory params,
-        uint256 timeout,
         Channel.State memory state,
         bytes[] memory sigs)
-    public beforeTimeout(timeout)
+    public
     {
         bytes32 channelID = calcChannelID(params);
         require(state.channelID == channelID, "tried refutation with invalid channelID");
         require(state.version > disputes[channelID].version , "only a refutation with a newer state is valid");
-        require(disputes[channelID].timeout == timeout,"provided wrong old state or timeout");
+        require(disputes[channelID].timeout > now, "tried refutation after timeout");
         require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "channel is not in state DISPUTE");
         validateSignatures(params, state, sigs);
         storeChallenge(params, state, channelID, DisputePhase.DISPUTE);
@@ -131,8 +110,6 @@ contract Adjudicator {
      *
      * @param params The parameters of the state channel.
      * @param stateOld The previously stored state of the state channel.
-     * @param timeout The previously stored timeout.
-     * @param disputePhase The phase in which the last stored state was.
      * @param state The new state to which we want to progress.
      * @param actorIdx Index of the signer in the participants array.
      * @param sig Signature of the participant that wants to progress the contract on the new state.
@@ -140,22 +117,20 @@ contract Adjudicator {
     function progress(
         Channel.Params memory params,
         Channel.State memory stateOld,
-        uint256 timeout,
-        DisputePhase disputePhase,
         Channel.State memory state,
         uint256 actorIdx,
         bytes memory sig)
     public
     {
-        if(disputePhase == DisputePhase.DISPUTE) {
-            require(now >= timeout, "function called before timeout");
-        }
         require(actorIdx < params.participants.length, "actorIdx out of range");
         bytes32 channelID = calcChannelID(params);
+        if(disputes[channelID].disputePhase == uint8(uint256(DisputePhase.DISPUTE))) {
+            require(now >= disputes[channelID].timeout, "function called before timeout");
+        }
         require(state.channelID == channelID, "tried progressing with invalid channelID");
-        require(disputes[channelID].stateHash == hashDispute(stateOld, timeout, disputePhase),
-            "provided wrong old state or timeout");
-        require(Sig.verify(Channel.encodeState(state), sig,params.participants[actorIdx]), "actorIdx is not set to the id of the sender");
+        require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "provided wrong old state");
+        require(Sig.verify(Channel.encodeState(state), sig,params.participants[actorIdx]),
+            "actorIdx is not set to the index of the sender");
         requireValidTransition(params, stateOld, state, actorIdx);
         storeChallenge(params, state, channelID, DisputePhase.FORCEEXEC);
         emit Progressed(channelID, state.version);
@@ -167,18 +142,15 @@ contract Adjudicator {
      *
      * @param params The parameters of the state channel.
      * @param state The previously stored state of the state channel.
-     * @param timeout The previously stored timeout.
-     * @param disputePhase The phase in which the last stored state was.
      */
     function conclude(
         Channel.Params memory params,
-        Channel.State memory state,
-        uint256 timeout,
-        DisputePhase disputePhase)
-    public afterTimeout(timeout)
+        Channel.State memory state)
+    public
     {
         bytes32 channelID = calcChannelID(params);
-        require(disputes[channelID].stateHash == hashDispute(state, timeout, disputePhase), "provided wrong old state or timeout");
+        require(disputes[channelID].timeout < now, "tried conclude before timeout");
+        require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "provided wrong old state");
         pushOutcome(channelID, params, state);
         emit Concluded(channelID);
     }
@@ -237,26 +209,11 @@ contract Adjudicator {
         // We require empty subAllocs because they are not implemented yet.
         require(state.outcome.locked.length == 0);
         uint256 timeout = now.add(params.challengeDuration);
-        disputes[channelID].stateHash = hashDispute(state, timeout, disputePhase);
+        disputes[channelID].stateHash = keccak256(abi.encode(state));
         disputes[channelID].timeout = uint64(timeout);
         disputes[channelID].disputePhase = uint8(disputePhase);
         disputes[channelID].version = state.version;
         emit Stored(channelID, timeout);
-    }
-
-    /**
-     * @dev Hashes a dispute to save gas.
-     * @param state The state of the state channel.
-     * @param timeout The timeout that should be hashed.
-     * @param disputePhase The phase in which the state is.
-     */
-    function hashDispute(
-        Channel.State memory state,
-        uint256 timeout,
-        DisputePhase disputePhase)
-    internal pure returns (bytes32)
-    {
-        return keccak256(abi.encode(state, timeout, uint256(disputePhase)));
     }
 
     /**
@@ -328,7 +285,8 @@ contract Adjudicator {
         bytes32[] memory subAllocs = new bytes32[](state.outcome.locked.length);
         for (uint256 i = 0; i < state.outcome.assets.length; i++) {
             AssetHolder a = AssetHolder(state.outcome.assets[i]);
-            require(state.outcome.balances[i].length == params.participants.length, "balances length should match participants length");
+            require(state.outcome.balances[i].length == params.participants.length,
+                "balances length should match participants length");
             // We set empty subAllocs because they are not implemented yet.
             a.setOutcome(channelID, params.participants, state.outcome.balances[i], subAllocs, balances[i]);
         }
