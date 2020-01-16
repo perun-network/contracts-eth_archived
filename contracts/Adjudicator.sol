@@ -50,7 +50,7 @@ contract Adjudicator {
 
     /**
      * @notice Register registers a non-final state of a channel.
-     * If the call was sucessful a Registered event is emitted.
+     * If the call was successful a Registered event is emitted.
      *
      * @dev It can only be called if no other dispute is currently in progress.
      * The caller has to provide n signatures on the state.
@@ -75,7 +75,7 @@ contract Adjudicator {
 
     /**
      * @notice Refute is called to refute a dispute.
-     * If the call was sucessful a Refuted event is emitted.
+     * If the call was successful a Refuted event is emitted.
      *
      * @dev Refute can only be called with a higher version state.
      * The caller has to provide n signatures on the new state.
@@ -129,7 +129,7 @@ contract Adjudicator {
         }
         require(state.channelID == channelID, "tried progressing with invalid channelID");
         require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "provided wrong old state");
-        require(Sig.verify(Channel.encodeState(state), sig,params.participants[actorIdx]),
+        require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]),
             "actorIdx is not set to the index of the sender");
         requireValidTransition(params, stateOld, state, actorIdx);
         storeChallenge(params, state, channelID, DisputePhase.FORCEEXEC);
