@@ -245,26 +245,6 @@ contract("Adjudicator", async (accounts) => {
     await truffleAssert.reverts(
       adj.refute(
         params.serialize(),
-        validState.serialize(),
-        validStateTimeout,
-        state.serialize(),
-        sigs,
-        { from: accounts[0] }),
-    );
-  });
-
-  it("refuting with wrong timeout fails", async () => {
-    let params = new Params(app, timeout, nonce, [parts[A], parts[B]]);
-    let channelID = params.channelID();
-    let outcome = new Allocation([asset], [[ether(1).toString(), ether(1).toString()]], []);
-    let state = new State(channelID, "5", outcome, "0x00", false);
-    let stateHash = hash(state.encode());
-    let sigs = [await sign(state.encode(), parts[A]), await sign(state.encode(), parts[B])];
-    await truffleAssert.reverts(
-      adj.refute(
-        params.serialize(),
-        validState.serialize(),
-        validStateTimeout + "1",
         state.serialize(),
         sigs,
         { from: accounts[0] }),
@@ -281,8 +261,6 @@ contract("Adjudicator", async (accounts) => {
     await truffleAssert.reverts(
       adj.refute(
         params.serialize(),
-        validState.serialize(),
-        validStateTimeout,
         state.serialize(),
         sigs,
         { from: accounts[0] }),
@@ -299,8 +277,6 @@ contract("Adjudicator", async (accounts) => {
     await truffleAssert.reverts(
       adj.refute(
         params.serialize(),
-        validState.serialize(),
-        validStateTimeout,
         state.serialize(),
         sigs,
         { from: accounts[0] }),
@@ -317,8 +293,6 @@ contract("Adjudicator", async (accounts) => {
     truffleAssert.eventEmitted(
       await adj.refute(
         params.serialize(),
-        validState.serialize(),
-        validStateTimeout,
         state.serialize(),
         sigs,
         { from: accounts[0] }),
@@ -344,8 +318,6 @@ contract("Adjudicator", async (accounts) => {
       adj.progress(
         params.serialize(),
         validState.serialize(),
-        validStateTimeout,
-        DISPUTE,
         state.serialize(),
         0,
         sig,
@@ -364,8 +336,6 @@ contract("Adjudicator", async (accounts) => {
       adj.progress(
         params.serialize(),
         validState.serialize(),
-        validStateTimeout,
-        DISPUTE,
         state.serialize(),
         0,
         sig,
@@ -505,8 +475,6 @@ contract("Adjudicator", async (accounts) => {
       adj.progress(
         params.serialize(),
         validState.serialize(),
-        validStateTimeout,
-        DISPUTE,
         state.serialize(),
         1,
         sig,
@@ -525,8 +493,6 @@ contract("Adjudicator", async (accounts) => {
       await adj.progress(
         params.serialize(),
         validState.serialize(),
-        validStateTimeout,
-        DISPUTE,
         state.serialize(),
         0,
         sig,
@@ -548,8 +514,6 @@ contract("Adjudicator", async (accounts) => {
       await adj.conclude(
         params.serialize(),
         validState.serialize(),
-        validStateTimeout,
-        FORCEMOVE,
         { from: parts[A] }),
       'PushOutcome',
       (ev: any) => {
