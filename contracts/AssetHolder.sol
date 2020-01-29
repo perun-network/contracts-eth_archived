@@ -28,6 +28,7 @@ contract AssetHolder {
 
     event OutcomeSet(bytes32 indexed channelID);
     event Deposited(bytes32 indexed fundingID, uint256 amount);
+    event Withdrawn(address indexed participant, uint256 amount);
 
     /**
      * @notice This mapping stores the balances of participants to their fundingID.
