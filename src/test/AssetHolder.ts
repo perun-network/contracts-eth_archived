@@ -169,8 +169,10 @@ contract("AssetHolderETH", async (accounts) => {
       let balanceBefore = await web3.eth.getBalance(parts[A]);
       let authorization = new Authorization(channelID, parts[A], parts[A], newBalances[A].toString());
       let signature = await sign(authorization.encode(), parts[A]);
-      await truffleAssert.passes(
-        await ah.withdraw(authorization, signature, {from: accounts[3]})
+      await truffleAssert.eventEmitted(
+        await ah.withdraw(authorization, signature, {from: accounts[3]}),
+        'Withdrawn',
+        (ev: any) => { return ev.amount == newBalances[A].toString(); }
       );
       let balanceAfter = await web3.eth.getBalance(parts[A]);
       assert(toBN(balanceBefore).add(ether(20)).eq(toBN(balanceAfter)));
@@ -180,8 +182,10 @@ contract("AssetHolderETH", async (accounts) => {
       let balanceBefore = await web3.eth.getBalance(parts[B]);
       let authorization = new Authorization(channelID, parts[B], parts[B], newBalances[B].toString());
       let signature = await sign(authorization.encode(), parts[B]);
-      await truffleAssert.passes(
-        await ah.withdraw(authorization, signature, {from: accounts[3]})
+      await truffleAssert.eventEmitted(
+        await ah.withdraw(authorization, signature, {from: accounts[3]}),
+        'Withdrawn',
+        (ev: any) => { return ev.amount == newBalances[B].toString(); }
       );
       let balanceAfter = await web3.eth.getBalance(parts[B]);
       assert(toBN(balanceBefore).add(ether(10)).eq(toBN(balanceAfter)));
@@ -215,7 +219,7 @@ contract("AssetHolderETH", async (accounts) => {
       assert(await ah.settled(channelID) == false);
       await truffleAssert.eventEmitted(
         await ah.setOutcome(channelID, parts, newBalances, [], [], {from: accounts[0]}),
-        'OutcomeSet' ,
+        'OutcomeSet',
         (ev: any) => { return ev.channelID == channelID; }
       );
       assert(await ah.settled(channelID) == true);
@@ -235,8 +239,10 @@ contract("AssetHolderETH", async (accounts) => {
       let balanceBefore = await web3.eth.getBalance(parts[A]);
       let authorization = new Authorization(channelID, parts[A], parts[A], ether(1).toString());
       let signature = await sign(authorization.encode(), parts[A]);
-      await truffleAssert.passes(
-        await ah.withdraw(authorization, signature, {from: accounts[3]})
+      await truffleAssert.eventEmitted(
+        await ah.withdraw(authorization, signature, {from: accounts[3]}),
+        'Withdrawn',
+        (ev: any) => { return ev.amount == ether(1).toString(); }
       );
       let balanceAfter = await web3.eth.getBalance(parts[A]);
       assert(toBN(balanceBefore).add(ether(1)).eq(toBN(balanceAfter)));
