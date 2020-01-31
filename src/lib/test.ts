@@ -34,7 +34,10 @@ export function asyncWeb3Send(method: string, params: any[], id?: number): Promi
 }
 
 export function fundingID(channelID: string, participant: string) {
-  return web3.utils.soliditySha3(channelID, participant);
+  return hash(web3.eth.abi.encodeParameters(
+      ['bytes32','address'],
+      [web3.utils.rightPad(channelID, 64, "0"),
+      participant]));
 }
 
 export function snapshot(name: string, tests: any) {
