@@ -5,7 +5,7 @@
 
 /// <reference types="truffle-typings" />
 import { assert, expect, should } from "chai";
-import { sign, ether, fundingID, snapshot } from "../lib/test";
+import { sign, ether, fundingID, hash, snapshot } from "../lib/test";
 should();
 const truffleAssert = require('truffle-assertions');
 import { AssetHolderETHContract, AssetHolderETHInstance } from "../../types/truffle-contracts";
@@ -48,7 +48,7 @@ class Authorization {
 
 contract("AssetHolderETH", async (accounts) => {
   let ah: AssetHolderETHInstance;
-  let channelID = fundingID("1234", "asdfasdf");
+  let channelID = hash("1234");
   const parts = [accounts[1], accounts[2]];
   const balance = [ether(10), ether(20)];
   const timeout = 60;
@@ -202,7 +202,7 @@ contract("AssetHolderETH", async (accounts) => {
 
   describe("Test underfunded channel", () => {
     // check withdrawal after a party refuses to deposit funds into asset holder
-    let channelID = fundingID("12345", "asdfasdf");
+    let channelID = hash("12345");
 
     it("a deposits 1 eth into a channel", async () => {
       let id = fundingID(channelID, parts[A]);

@@ -40,10 +40,10 @@ contract Adjudicator {
      */
     mapping(bytes32 => Dispute) public disputes;
 
-    event Registered(bytes32 indexed channelID, uint256 version);
-    event Refuted(bytes32 indexed channelID, uint256 version);
-    event Progressed(bytes32 indexed channelID, uint256 version);
-    event Stored(bytes32 indexed channelID, uint256 timeout);
+    event Registered(bytes32 indexed channelID, uint64 version);
+    event Refuted(bytes32 indexed channelID, uint64 version);
+    event Progressed(bytes32 indexed channelID, uint64 version);
+    event Stored(bytes32 indexed channelID, uint64 version, uint64 timeout);
     event FinalConcluded(bytes32 indexed channelID);
     event Concluded(bytes32 indexed channelID);
     event PushOutcome(bytes32 indexed channelID);
@@ -213,7 +213,7 @@ contract Adjudicator {
         disputes[channelID].timeout = uint64(timeout);
         disputes[channelID].disputePhase = uint8(disputePhase);
         disputes[channelID].version = state.version;
-        emit Stored(channelID, timeout);
+        emit Stored(channelID, state.version, uint64(timeout));
     }
 
     /**
