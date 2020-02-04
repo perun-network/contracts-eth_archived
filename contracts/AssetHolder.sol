@@ -80,6 +80,7 @@ contract AssetHolder {
 
         // The channelID itself might already be funded
         uint256 sumHeld = holdings[channelID];
+        holdings[channelID] = 0;
         uint256 sumOutcome = 0;
 
         bytes32[] memory fundingIDs = new bytes32[](parts.length);
@@ -110,7 +111,7 @@ contract AssetHolder {
      * @return The funding ID, an identifier used for indexing.
      */
     function calcFundingID(bytes32 channelID, address participant) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(channelID, participant));
+        return keccak256(abi.encode(channelID, participant));
     }
 
     /**
