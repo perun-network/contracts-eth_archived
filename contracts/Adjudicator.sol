@@ -36,7 +36,7 @@ contract Adjudicator {
     }
 
     /**
-     * @dev Mapping channelID => H(state, timeout, disputephase).
+     * @dev Mapping channelID => Dispute.
      */
     mapping(bytes32 => Dispute) public disputes;
 
