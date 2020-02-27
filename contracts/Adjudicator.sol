@@ -45,8 +45,8 @@ contract Adjudicator {
     event Progressed(bytes32 indexed channelID, uint64 version);
     event Stored(bytes32 indexed channelID, uint64 version, uint64 timeout);
     event FinalConcluded(bytes32 indexed channelID);
-    event Concluded(bytes32 indexed channelID);
-    event PushOutcome(bytes32 indexed channelID);
+    event Concluded(bytes32 indexed channelID, uint64 version);
+    event OutcomePushed(bytes32 indexed channelID, uint64 version);
 
     /**
      * @notice Register registers a non-final state of a channel.
@@ -152,7 +152,7 @@ contract Adjudicator {
         require(disputes[channelID].timeout < now, "tried conclude before timeout");
         require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "provided wrong old state");
         pushOutcome(channelID, params, state);
-        emit Concluded(channelID);
+        emit Concluded(channelID, state.version);
     }
 
     /**
@@ -180,7 +180,7 @@ contract Adjudicator {
         validateSignatures(params, state, sigs);
         pushOutcome(channelID, params, state);
         emit FinalConcluded(channelID);
-        emit Concluded(channelID);
+        emit Concluded(channelID, state.version);
     }
 
     /**
@@ -290,7 +290,7 @@ contract Adjudicator {
             // We set empty subAllocs because they are not implemented yet.
             a.setOutcome(channelID, params.participants, state.outcome.balances[i], subAllocs, balances[i]);
         }
-        emit PushOutcome(channelID);
+        emit OutcomePushed(channelID, state.version);
     }
 
     /**
