@@ -204,7 +204,7 @@ contract("AssetHolderETH", async (accounts) => {
     // check withdrawal after a party refuses to deposit funds into asset holder
     let channelID = hash("12345");
 
-    it("a deposits 1 eth into a channel", async () => {
+    it("A deposits 1 eth into a channel", async () => {
       let id = fundingID(channelID, parts[A]);
       truffleAssert.eventEmitted(
         await ah.deposit(id, ether(1), {value: ether(1), from: accounts[3]}),
