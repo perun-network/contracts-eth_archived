@@ -12,7 +12,8 @@ import "./Sig.sol";
 /**
  * @title The Perun AssetHolder
  * @author The Perun Authors
- * @dev AssetHolderETH is a concrete implementation of AssetHolder that handles the base currency.
+ * @dev AssetHolderETH is a concrete implementation of AssetHolder that handles
+ * the base currency.
  */
 contract AssetHolderETH is AssetHolder {
 
@@ -28,7 +29,8 @@ contract AssetHolderETH is AssetHolder {
 
     /**
      * @notice Used to deposit money into a channel.
-     * @dev Using the fundingID like this hides both the channelID as well as the participant address until a channel is settled.
+     * @dev Using the fundingID like this hides both the channelID as well as
+     * the participant address until a channel is settled.
      * @param fundingID Unique identifier for a participant in a channel.
      * @param amount Amount of money that should be deposited.
      */
@@ -40,12 +42,14 @@ contract AssetHolderETH is AssetHolder {
 
     /**
      * @notice Sends money from authorization.participant to authorization.receiver.
-     * @param authorization WithdrawalAuth struct that is used to send money from an ephemeral key to an on-chain key.
+     * @param authorization WithdrawalAuth struct that is used to send money
+     * from an ephemeral key to an on-chain key.
      * @param signature Signature on the withdrawal authorization
      */
     function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public {
         require(settled[authorization.channelID], "channel not settled");
-        require(Sig.verify(abi.encode(authorization), signature, authorization.participant), "signature verification failed");
+        require(Sig.verify(abi.encode(authorization), signature, authorization.participant),
+                "signature verification failed");
         bytes32 id = calcFundingID(authorization.channelID, authorization.participant);
         require(holdings[id] >= authorization.amount, "insufficient ETH for withdrawal");
         // Decrease holdings, then transfer the money.
