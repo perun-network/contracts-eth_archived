@@ -159,9 +159,10 @@ contract Adjudicator {
      * @notice ConcludeFinal can be used to immediately conclude a final state
      * without registering it or waiting for a timeout.
      * If the call was successful, a FinalConcluded and Concluded event is emitted.
+     * Since any fully-signed final state supersedes any ongoing dispute,
+     * concludeFinal may skip any registered dispute.
      *
      * @dev The caller has to provide n signatures on the final state.
-     * It can only be called if no other dispute for this channel was registered.
      *
      * @param params The parameters of the state channel.
      * @param state The current state of the state channel.
@@ -176,7 +177,6 @@ contract Adjudicator {
         require(state.isFinal == true, "only accept final states");
         bytes32 channelID = calcChannelID(params);
         require(state.channelID == channelID, "tried registering invalid channelID");
-        require(disputes[channelID].stateHash == bytes32(0), "a dispute was already registered");
         validateSignatures(params, state, sigs);
         pushOutcome(channelID, params, state);
         emit FinalConcluded(channelID);
