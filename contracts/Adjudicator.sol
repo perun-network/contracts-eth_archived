@@ -65,8 +65,8 @@ contract Adjudicator {
     public
     {
         bytes32 channelID = calcChannelID(params);
-        require(state.channelID == channelID, "tried registering invalid channelID");
-        require(disputes[channelID].stateHash == bytes32(0), "a dispute was already registered");
+        require(state.channelID == channelID, "invalid channelID");
+        require(disputes[channelID].stateHash == bytes32(0), "state already registered");
         validateSignatures(params, state, sigs);
         storeChallenge(params, state, channelID, DisputePhase.DISPUTE);
         emit Registered(channelID, state.version);
@@ -90,10 +90,11 @@ contract Adjudicator {
     public
     {
         bytes32 channelID = calcChannelID(params);
-        require(state.channelID == channelID, "tried refutation with invalid channelID");
-        require(state.version > disputes[channelID].version , "only a refutation with a newer state is valid");
-        require(disputes[channelID].timeout > now, "tried refutation after timeout");
-        require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "channel is not in state DISPUTE");
+        require(state.channelID == channelID, "invalid channelID");
+        require(state.version > disputes[channelID].version , "can only refute with newer state");
+        require(disputes[channelID].timeout > now, "timeout passed");
+        require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE),
+                "channel must be in DISPUTE phase");
         validateSignatures(params, state, sigs);
         storeChallenge(params, state, channelID, DisputePhase.DISPUTE);
         emit Refuted(channelID, state.version);
@@ -129,10 +130,10 @@ contract Adjudicator {
             require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC),
                     "channel must be in FORCEEXEC phase");
         }
-        require(state.channelID == channelID, "tried progressing with invalid channelID");
-        require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "provided wrong old state");
+        require(state.channelID == channelID, "invalid channelID");
+        require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "wrong old state");
         require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]),
-            "actorIdx is not set to the index of the sender");
+            "actorIdx does not match signer's index");
         requireValidTransition(params, stateOld, state, actorIdx);
         storeChallenge(params, state, channelID, DisputePhase.FORCEEXEC);
         emit Progressed(channelID, state.version);
@@ -176,9 +177,9 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
-        require(state.isFinal == true, "only accept final states");
+        require(state.isFinal == true, "state not final");
         bytes32 channelID = calcChannelID(params);
-        require(state.channelID == channelID, "tried registering invalid channelID");
+        require(state.channelID == channelID, "invalid channelID");
         validateSignatures(params, state, sigs);
 
         _conclude(channelID, params, state);
@@ -210,7 +211,7 @@ contract Adjudicator {
     internal
     {
         // We require empty subAllocs because they are not implemented yet.
-        require(state.outcome.locked.length == 0);
+        require(state.outcome.locked.length == 0, "not implemented yet");
         uint256 timeout = now.add(params.challengeDuration);
         disputes[channelID].stateHash = keccak256(abi.encode(state));
         disputes[channelID].timeout = uint64(timeout);
@@ -235,8 +236,8 @@ contract Adjudicator {
         uint256 actorIdx)
     internal pure
     {
-        require(to.version == from.version + 1, "can only advance the version counter by one");
-        require(from.isFinal == false, "cannot advance from final state");
+        require(to.version == from.version + 1, "version counter must increment by one");
+        require(from.isFinal == false, "cannot progress from final state");
         requireAssetPreservation(from.outcome, to.outcome, params.participants.length);
         App app = App(params.app);
         app.validTransition(params, from, to, actorIdx);
@@ -255,24 +256,24 @@ contract Adjudicator {
     internal pure
     {
         require(oldAlloc.balances.length == newAlloc.balances.length,
-                "length of balances do not match");
+                "balances length mismatch");
         require(oldAlloc.assets.length == newAlloc.assets.length,
-                "length of assets do not match");
+                "assets length mismatch");
         for (uint256 i = 0; i < newAlloc.assets.length; i++) {
-            require(oldAlloc.assets[i] == newAlloc.assets[i], 'asset addresses mismatch');
+            require(oldAlloc.assets[i] == newAlloc.assets[i], "assets[i] address mismatch");
             uint256 sumOld = 0;
             uint256 sumNew = 0;
             require(oldAlloc.balances[i].length == numParts,
-                    "length of balances[i] of oldAlloc does not match numParts");
+                    "oldAlloc: balances[i] length mismatch");
             require(newAlloc.balances[i].length == numParts,
-                    "length of balances[i] do newAlloc does not match numParts");
+                    "newAlloc: balances[i] length mismatch");
             for (uint256 k = 0; k < numParts; k++) {
                 sumOld = sumOld.add(oldAlloc.balances[i][k]);
                 sumNew = sumNew.add(newAlloc.balances[i][k]);
             }
-            require(oldAlloc.locked.length == 0, "subAllocs currently not implemented");
-            require(newAlloc.locked.length == 0, "subAllocs currently not implemented");
-            require(sumOld == sumNew, 'Sum of balances for an asset must be equal');
+            require(oldAlloc.locked.length == 0, "not implemented yet");
+            require(newAlloc.locked.length == 0, "not implemented yet");
+            require(sumOld == sumNew, "sum of balances mismatch");
         }
     }
 
@@ -314,7 +315,7 @@ contract Adjudicator {
         for (uint256 i = 0; i < state.outcome.assets.length; i++) {
             AssetHolder a = AssetHolder(state.outcome.assets[i]);
             require(state.outcome.balances[i].length == params.participants.length,
-                "balances length should match participants length");
+                "balances[i] length mismatch");
             // We set empty subAllocs because they are not implemented yet.
             a.setOutcome(channelID, params.participants, state.outcome.balances[i], subAllocs, balances[i]);
         }
@@ -333,7 +334,7 @@ contract Adjudicator {
     internal pure
     {
         bytes memory encodedState = Channel.encodeState(state);
-        require(params.participants.length == sigs.length, "invalid length of signatures");
+        require(params.participants.length == sigs.length, "signatures length mismatch");
         for (uint256 i = 0; i < sigs.length; i++) {
             require(Sig.verify(encodedState, sigs[i], params.participants[i]), "invalid signature");
         }
