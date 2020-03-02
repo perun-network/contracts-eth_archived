@@ -270,7 +270,9 @@ contract("Adjudicator", async (accounts) => {
         if (test.revert) {
           await truffleAssert.reverts(res);
         } else {
-          assertEventEmitted('Stored', await res, tx);
+          let ress = await res;
+          assertEventEmitted('Stored', ress, tx);
+          assertEventEmitted('Registered', ress, tx);
         }
       })
     });
@@ -317,7 +319,9 @@ contract("Adjudicator", async (accounts) => {
         if (test.revert) {
           await truffleAssert.reverts(res);
         } else {
-          assertEventEmitted('Stored', await res, tx);
+          let ress = await res;
+          assertEventEmitted('Refuted', ress, tx);
+          assertEventEmitted('Stored', ress, tx);
         }
       })
     });
@@ -380,7 +384,9 @@ contract("Adjudicator", async (accounts) => {
         if (test.revert) {
           await truffleAssert.reverts(res);
         } else {
-          assertEventEmitted('OutcomePushed', await res, tx);
+          let ress = await res;
+          assertEventEmitted('Concluded', ress, tx);
+          assertEventEmitted('FinalConcluded', ress, tx);
         }
       });
     });
@@ -391,7 +397,9 @@ contract("Adjudicator", async (accounts) => {
       let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
       tx.state.version = "4";
       await tx.sign(parts);
-      assertEventEmitted('Stored', await register(tx), tx);
+      let res = await register(tx);
+      assertEventEmitted('Stored', res, tx);
+      assertEventEmitted('Registered', res, tx);
     });
 
     const testsProgress = [
@@ -455,7 +463,9 @@ contract("Adjudicator", async (accounts) => {
         if (test.revert) {
           await truffleAssert.reverts(res);
         } else {
-          assertEventEmitted('Stored', await res, tx);
+          let ress = await res;
+          assertEventEmitted('Stored', ress, tx);
+          assertEventEmitted('Progressed', ress, tx);
         }
       })
     });
@@ -474,7 +484,9 @@ contract("Adjudicator", async (accounts) => {
         tx.sigs[0],
         { from: accounts[0] },
       );
-      assertEventEmitted('Stored', await res , tx);
+      let ress = await res;
+      assertEventEmitted('Stored', ress, tx);
+      assertEventEmitted('Progressed', ress, tx);
     })
   });
 
@@ -485,7 +497,6 @@ contract("Adjudicator", async (accounts) => {
       tx.state.isFinal = true;
       await tx.sign(parts);
       let res = await concludeFinal(tx);
-      assertEventEmitted('OutcomePushed', res, tx);
       assertEventEmitted('Concluded', res, tx);
       assertEventEmitted('FinalConcluded', res, tx);
     });
@@ -504,7 +515,6 @@ contract("Adjudicator", async (accounts) => {
       let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
       tx.state.version = "6";
       let res = await conclude(tx);
-      assertEventEmitted('OutcomePushed', res, tx);
       assertEventEmitted('Concluded', res, tx);
     });
   })
