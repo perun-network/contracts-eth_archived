@@ -325,24 +325,6 @@ contract("Adjudicator", async (accounts) => {
         }
       })
     });
-
-    // progress
-    it("progress before timeout fails", async () => {
-      let txOld = new Transaction(parts, balance, timeout, nonce, asset, app);
-      txOld.state.version = "5";
-      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
-      tx.state.version = "6";
-      await tx.sign([parts[0], parts[0]]);
-      await truffleAssert.reverts(
-        adj.progress(
-          tx.params.serialize(),
-          txOld.state.serialize(),
-          tx.state.serialize(),
-          0,
-          tx.sigs[0],
-          { from: accounts[0] }),
-      );
-    });
   });
 
   snapshot("concludeFinal", () => {
