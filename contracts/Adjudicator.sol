@@ -46,7 +46,6 @@ contract Adjudicator {
     event Stored(bytes32 indexed channelID, uint64 version, uint64 timeout);
     event FinalConcluded(bytes32 indexed channelID);
     event Concluded(bytes32 indexed channelID, uint64 version);
-    event OutcomePushed(bytes32 indexed channelID, uint64 version);
 
     /**
      * @notice Register registers a non-final state of a channel.
@@ -319,7 +318,6 @@ contract Adjudicator {
             // We set empty subAllocs because they are not implemented yet.
             a.setOutcome(channelID, params.participants, state.outcome.balances[i], subAllocs, balances[i]);
         }
-        emit OutcomePushed(channelID, state.version);
     }
 
     /**
