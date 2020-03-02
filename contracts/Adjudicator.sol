@@ -26,7 +26,7 @@ contract Adjudicator {
      * In the DISPUTE phase, all parties have the ability to publish their latest state.
      * In the FORCEEXEC phase, the smart contract is executed on-chain.
      */
-    enum DisputePhase { DISPUTE, FORCEEXEC }
+    enum DisputePhase { DISPUTE, FORCEEXEC, CONCLUDED }
 
     struct Dispute {
         uint64 timeout;
@@ -124,8 +124,11 @@ contract Adjudicator {
     {
         require(actorIdx < params.participants.length, "actorIdx out of range");
         bytes32 channelID = calcChannelID(params);
-        if(disputes[channelID].disputePhase == uint8(uint256(DisputePhase.DISPUTE))) {
-            require(now >= disputes[channelID].timeout, "function called before timeout");
+        if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
+            require(disputes[channelID].timeout <= now, "timeout not passed yet");
+        } else {
+            require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC),
+                    "channel must be in FORCEEXEC phase");
         }
         require(state.channelID == channelID, "tried progressing with invalid channelID");
         require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "provided wrong old state");
@@ -149,10 +152,10 @@ contract Adjudicator {
     public
     {
         bytes32 channelID = calcChannelID(params);
-        require(disputes[channelID].timeout < now, "tried conclude before timeout");
-        require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "provided wrong old state");
-        pushOutcome(channelID, params, state);
-        emit Concluded(channelID, state.version);
+        require(disputes[channelID].timeout <= now, "timeout not passed yet");
+        require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "wrong old state");
+
+        _conclude(channelID, params, state);
     }
 
     /**
@@ -178,9 +181,10 @@ contract Adjudicator {
         bytes32 channelID = calcChannelID(params);
         require(state.channelID == channelID, "tried registering invalid channelID");
         validateSignatures(params, state, sigs);
-        pushOutcome(channelID, params, state);
+
+        _conclude(channelID, params, state);
+
         emit FinalConcluded(channelID);
-        emit Concluded(channelID, state.version);
     }
 
     /**
@@ -271,6 +275,27 @@ contract Adjudicator {
             require(newAlloc.locked.length == 0, "subAllocs currently not implemented");
             require(sumOld == sumNew, 'Sum of balances for an asset must be equal');
         }
+    }
+
+    /**
+     * @notice Concludes the channel by setting the outcome on all asset holder.
+     * @dev Called by conclude and concludeFinal. Records the channel as
+     * concluded so repeated conclude calls are not possible.
+     * @param channelID The unique identifier of the channel.
+     * @param params The parameters of the state channel.
+     * @param state The current state of the state channel.
+     */
+    function _conclude(
+        bytes32 channelID,
+        Channel.Params memory params,
+        Channel.State memory state)
+    internal
+    {
+        require(disputes[channelID].disputePhase != uint8(DisputePhase.CONCLUDED),
+            "channel already concluded");
+        disputes[channelID].disputePhase = uint8(DisputePhase.CONCLUDED);
+        pushOutcome(channelID, params, state);
+        emit Concluded(channelID, state.version);
     }
 
     /**
