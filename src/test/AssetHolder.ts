@@ -5,13 +5,14 @@
 
 /// <reference types="truffle-typings" />
 import { assert, expect, should } from "chai";
-import { sign, ether, fundingID, hash, snapshot } from "../lib/test";
 should();
 const truffleAssert = require('truffle-assertions');
-import { AssetHolderETHContract, AssetHolderETHInstance } from "../../types/truffle-contracts";
 import Web3 from "web3";
+declare const web3: Web3;
+import { AssetHolderETHContract, AssetHolderETHInstance } from "../../types/truffle-contracts";
+import { sign, ether, wei2eth, hash } from "../lib/web3";
+import { fundingID, snapshot } from "../lib/test";
 
-var web3 = new Web3(Web3.givenProvider || 'http://127.0.0.1:7545/');
 const AssetHolderETH = artifacts.require<AssetHolderETHContract>("AssetHolderETH");
 const toBN = web3.utils.toBN;
 
