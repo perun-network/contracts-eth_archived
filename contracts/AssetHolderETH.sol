@@ -20,12 +20,11 @@ contract AssetHolderETH is AssetHolder {
     using SafeMath for uint256;
 
     /**
-     * @notice Constructs a new instance of this contract.
-     * @param _adjudicator The address of the adjudicator singleton contract.
+     * @notice Sets the adjudicator contract by calling the constructor of the
+     * base asset holder contract.
+     * @param _adjudicator Address of the adjudicator contract.
      */
-    constructor(address _adjudicator) public {
-        adjudicator = _adjudicator;
-    }
+    constructor(address _adjudicator) public AssetHolder(_adjudicator) {} // solhint-disable-line no-empty-blocks
 
     /**
      * @notice Used to deposit money into a channel.

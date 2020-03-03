@@ -43,22 +43,30 @@ contract AssetHolder {
     mapping(bytes32 => bool) public settled;
 
     /**
-     * @notice adjudicator stores the address of the adjudicator contract that can call setOutcome().
-     * @dev This should only be set in the constructor of the implementing contract.
+     * @notice Address of the adjudicator contract that can call setOutcome.
+     * @dev Set by the constructor.
      */
-    address public adjudicator = address(0);
+    address public adjudicator;
 
     /**
      * @notice The onlyAdjudicator modifier specifies functions that can only be called from the adjudicator contract.
      */
     modifier onlyAdjudicator {
         require(msg.sender == adjudicator,
-            "This method can only be called by the adjudicator contract");
+            "can only be called by the adjudicator");
         _;
     }
 
     /**
-     * @notice Sets the final outcome of a channel, can only be called by the adjudicator.
+     * @notice Sets the adjudicator contract that is able to call setOutcome on this contract.
+     * @param _adjudicator Address of the adjudicator contract.
+     */
+    constructor(address _adjudicator) internal {
+        adjudicator = _adjudicator;
+    }
+
+    /**
+     * @notice Sets the final outcome of a channel. Can only be called by the adjudicator.
      * @dev This method should not be overwritten by the implementing contract.
      * @param channelID ID of the channel that should be disbursed.
      * @param parts Array of participants of the channel.
