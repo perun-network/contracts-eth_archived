@@ -105,6 +105,24 @@ contract AssetHolder {
     }
 
     /**
+     * @notice Function that is used to fund a channel.
+     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
+     * @param fundingID Unique identifier for a participant in a channel.
+     * Calculated as the hash of the channel id and the participant address.
+     * @param amount Amount of money that should be deposited.
+     */
+    function deposit(bytes32 fundingID, uint256 amount) external payable;
+
+    /**
+     * @notice Sends money from authorization.participant to authorization.receiver.
+     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
+     * @param authorization WithdrawalAuth that specifies which account receives
+     * what amounf of asset from which channel participant.
+     * @param signature Signature on the withdrawal authorization.
+     */
+    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external;
+
+    /**
      * @notice Internal helper function that calculates the fundingID.
      * @param channelID ID of the channel.
      * @param participant Address of a participant in the channel.
@@ -113,20 +131,4 @@ contract AssetHolder {
     function calcFundingID(bytes32 channelID, address participant) internal pure returns (bytes32) {
         return keccak256(abi.encode(channelID, participant));
     }
-
-    /**
-     * @notice Function that is used to fund a channel.
-     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
-     * @param fundingID Unique identifier for a participant in a channel.
-     * @param amount Amount of money that should be deposited.
-     */
-    function deposit(bytes32 fundingID, uint256 amount) external payable;
-
-    /**
-     * @notice Sends money from authorization.participant to authorization.receiver.
-     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
-     * @param authorization WithdrawalAuth struct that is used to send money from an ephemeral key to an on-chain key.
-     * @param signature Signature on the withdrawal authorization.
-     */
-    function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public;
 }
