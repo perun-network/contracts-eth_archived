@@ -75,7 +75,7 @@ contract("AssetHolderETH", async (accounts) => {
   describe("Funding...", () => {
     it("A deposits 9 eth into a channel", async () => {
       let id = fundingID(channelID, parts[A]);
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.deposit(id, ether(9), {value: ether(9), from: parts[A]}),
         'Deposited',
         (ev: any) => {return ev.fundingID == id; }
@@ -86,7 +86,7 @@ contract("AssetHolderETH", async (accounts) => {
     it("B deposits 20 eth into a channel", async () => {
       let id = fundingID(channelID, parts[B]);
       let amount = balance[B];
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.deposit(id, amount, {value: amount, from: parts[B]}),
         'Deposited',
         (ev: any) => { return ev.fundingID == id; }
@@ -104,7 +104,7 @@ contract("AssetHolderETH", async (accounts) => {
 
     it("A tops up their channel with 1 eth", async () => {
       let id = fundingID(channelID, parts[A]);
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.deposit(id, ether(1), {value: ether(1), from: parts[A]}),
         'Deposited',
         (ev: any) => { return ev.fundingID == id; }
@@ -127,7 +127,7 @@ contract("AssetHolderETH", async (accounts) => {
     it("set outcome of the asset holder", async () => {
       assert(newBalances.length == parts.length);
       assert(await ah.settled(channelID) == false);
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.setOutcome(channelID, parts, newBalances, [], [], {from: accounts[0]}),
         'OutcomeSet' ,
         (ev: any) => { return ev.channelID == channelID }
@@ -169,7 +169,7 @@ contract("AssetHolderETH", async (accounts) => {
       let balanceBefore = await web3.eth.getBalance(parts[A]);
       let authorization = new Authorization(channelID, parts[A], parts[A], newBalances[A].toString());
       let signature = await sign(authorization.encode(), parts[A]);
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.withdraw(authorization, signature, {from: accounts[3]}),
         'Withdrawn',
         (ev: any) => { return ev.amount == newBalances[A].toString(); }
@@ -182,7 +182,7 @@ contract("AssetHolderETH", async (accounts) => {
       let balanceBefore = await web3.eth.getBalance(parts[B]);
       let authorization = new Authorization(channelID, parts[B], parts[B], newBalances[B].toString());
       let signature = await sign(authorization.encode(), parts[B]);
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.withdraw(authorization, signature, {from: accounts[3]}),
         'Withdrawn',
         (ev: any) => { return ev.amount == newBalances[B].toString(); }
@@ -204,7 +204,7 @@ contract("AssetHolderETH", async (accounts) => {
     // check withdrawal after a party refuses to deposit funds into asset holder
     let channelID = hash("12345");
 
-    it("a deposits 1 eth into a channel", async () => {
+    it("A deposits 1 eth into a channel", async () => {
       let id = fundingID(channelID, parts[A]);
       truffleAssert.eventEmitted(
         await ah.deposit(id, ether(1), {value: ether(1), from: accounts[3]}),
@@ -217,7 +217,7 @@ contract("AssetHolderETH", async (accounts) => {
     it("set outcome of the asset holder with deposit refusal", async () => {
       assert(newBalances.length == parts.length);
       assert(await ah.settled(channelID) == false);
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.setOutcome(channelID, parts, newBalances, [], [], {from: accounts[0]}),
         'OutcomeSet',
         (ev: any) => { return ev.channelID == channelID; }
@@ -239,7 +239,7 @@ contract("AssetHolderETH", async (accounts) => {
       let balanceBefore = await web3.eth.getBalance(parts[A]);
       let authorization = new Authorization(channelID, parts[A], parts[A], ether(1).toString());
       let signature = await sign(authorization.encode(), parts[A]);
-      await truffleAssert.eventEmitted(
+      truffleAssert.eventEmitted(
         await ah.withdraw(authorization, signature, {from: accounts[3]}),
         'Withdrawn',
         (ev: any) => { return ev.amount == ether(1).toString(); }

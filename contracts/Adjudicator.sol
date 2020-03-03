@@ -45,8 +45,8 @@ contract Adjudicator {
     event Progressed(bytes32 indexed channelID, uint64 version);
     event Stored(bytes32 indexed channelID, uint64 version, uint64 timeout);
     event FinalConcluded(bytes32 indexed channelID);
-    event Concluded(bytes32 indexed channelID);
-    event PushOutcome(bytes32 indexed channelID);
+    event Concluded(bytes32 indexed channelID, uint64 version);
+    event OutcomePushed(bytes32 indexed channelID, uint64 version);
 
     /**
      * @notice Register registers a non-final state of a channel.
@@ -152,7 +152,7 @@ contract Adjudicator {
         require(disputes[channelID].timeout < now, "tried conclude before timeout");
         require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "provided wrong old state");
         pushOutcome(channelID, params, state);
-        emit Concluded(channelID);
+        emit Concluded(channelID, state.version);
     }
 
     /**
@@ -180,7 +180,7 @@ contract Adjudicator {
         validateSignatures(params, state, sigs);
         pushOutcome(channelID, params, state);
         emit FinalConcluded(channelID);
-        emit Concluded(channelID);
+        emit Concluded(channelID, state.version);
     }
 
     /**
@@ -251,14 +251,18 @@ contract Adjudicator {
         uint256 numParts)
     internal pure
     {
-        require(oldAlloc.balances.length == newAlloc.balances.length, "length of balances do not match");
-        require(oldAlloc.assets.length == newAlloc.assets.length, "length of assets do not match");
+        require(oldAlloc.balances.length == newAlloc.balances.length,
+                "length of balances do not match");
+        require(oldAlloc.assets.length == newAlloc.assets.length,
+                "length of assets do not match");
         for (uint256 i = 0; i < newAlloc.assets.length; i++) {
             require(oldAlloc.assets[i] == newAlloc.assets[i], 'asset addresses mismatch');
             uint256 sumOld = 0;
             uint256 sumNew = 0;
-            require(oldAlloc.balances[i].length == numParts, "length of balances[i] of oldAlloc does not match numParts");
-            require(newAlloc.balances[i].length == numParts, "length of balances[i] do newAlloc does not match numParts");
+            require(oldAlloc.balances[i].length == numParts,
+                    "length of balances[i] of oldAlloc does not match numParts");
+            require(newAlloc.balances[i].length == numParts,
+                    "length of balances[i] do newAlloc does not match numParts");
             for (uint256 k = 0; k < numParts; k++) {
                 sumOld = sumOld.add(oldAlloc.balances[i][k]);
                 sumNew = sumNew.add(newAlloc.balances[i][k]);
@@ -290,7 +294,7 @@ contract Adjudicator {
             // We set empty subAllocs because they are not implemented yet.
             a.setOutcome(channelID, params.participants, state.outcome.balances[i], subAllocs, balances[i]);
         }
-        emit PushOutcome(channelID);
+        emit OutcomePushed(channelID, state.version);
     }
 
     /**
