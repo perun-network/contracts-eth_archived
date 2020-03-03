@@ -92,6 +92,7 @@ contract Adjudicator {
         bytes32 channelID = calcChannelID(params);
         require(state.channelID == channelID, "invalid channelID");
         require(state.version > disputes[channelID].version , "can only refute with newer state");
+        // solhint-disable-next-line not-rely-on-time
         require(disputes[channelID].timeout > now, "timeout passed");
         require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE),
                 "channel must be in DISPUTE phase");
@@ -125,6 +126,7 @@ contract Adjudicator {
         require(actorIdx < params.participants.length, "actorIdx out of range");
         bytes32 channelID = calcChannelID(params);
         if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
+            // solhint-disable-next-line not-rely-on-time
             require(disputes[channelID].timeout <= now, "timeout not passed yet");
         } else {
             require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC),
@@ -152,6 +154,7 @@ contract Adjudicator {
     public
     {
         bytes32 channelID = calcChannelID(params);
+        // solhint-disable-next-line not-rely-on-time
         require(disputes[channelID].timeout <= now, "timeout not passed yet");
         require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "wrong old state");
 
@@ -212,6 +215,7 @@ contract Adjudicator {
     {
         // We require empty subAllocs because they are not implemented yet.
         require(state.outcome.locked.length == 0, "not implemented yet");
+        // solhint-disable-next-line not-rely-on-time
         uint256 timeout = now.add(params.challengeDuration);
         disputes[channelID].stateHash = keccak256(abi.encode(state));
         disputes[channelID].timeout = uint64(timeout);
