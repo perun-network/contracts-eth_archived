@@ -1,12 +1,31 @@
 stages:
-  - build
   - lint
+  - build
   - security
 cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
   - node_modules/
+  - .yarn/
   - build/
+
+solium:
+  image: node:10
+  stage: lint
+  before_script:
+    - npm install -g ethlint
+  script:
+    - solium -d contracts/
+  allow_failure: false
+
+solhint:
+  image: node:10
+  stage: lint
+  before_script:
+    - npm install -g solhint
+  script:
+    - solhint "contracts/**/*.sol"
+  allow_failure: false
 
 build:
   image: node:10
@@ -49,21 +68,3 @@ mythril:
     changes:
         - contracts/*
   allow_failure: false
-
-solium:
-  image: node:10
-  stage: security
-  before_script:
-    - npm install -g ethlint
-  script:
-    - solium -d contracts/
-  allow_failure: true
-
-solhint:
-  image: node:10
-  stage: lint
-  before_script:
-    - npm install -g solhint
-  script:
-    - solhint "contracts/**/*.sol"
-  allow_failure: true
