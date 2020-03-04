@@ -34,66 +34,95 @@ class Authorization {
       channelID: this.channelID,
       participant: this.participant,
       receiver: this.receiver,
-      amount: this.amount};
+      amount: this.amount
+    };
   }
 
   encode() {
     return web3.eth.abi.encodeParameters(
       ['bytes32','address','address','uint256'],
-      [web3.utils.rightPad(this.channelID, 64, "0"),
-      this.participant,
-      this.receiver,
-      web3.utils.padLeft(this.amount, 64, "0")]);
+      [
+        web3.utils.rightPad(this.channelID, 64, "0"),
+        this.participant,
+        this.receiver,
+        web3.utils.padLeft(this.amount.toString(), 64, "0")
+      ]
+    );
   }
 }
 
 contract("AssetHolderETH", async (accounts) => {
   let ah: AssetHolderETHInstance;
-  let channelID = hash("1234");
+  const channelID = hash("1234");
+  const adj = accounts[0]; // emulated adjudicator contract
+  const txSender = accounts[5]; // sender of transactions
   const parts = [accounts[1], accounts[2]];
   const balance = [ether(10), ether(20)];
   const timeout = 60;
-  const newBalances = [ether(20), ether(10)];
-  const A = 0, B = 1
+  const recv = [accounts[3], accounts[4]];
+  const finalBalance = [ether(20), ether(10)];
+  const name = [ "A", "B" ];
+  const A = 0, B = 1;
 
   it("account[0] should deploy the AssetHolderETH contract", async () => {
-      ah = await AssetHolderETH.new(accounts[0]);
-      let adj = await ah.adjudicator();
-      assert(adj == accounts[0]);
+      ah = await AssetHolderETH.new(adj);
+      let adjAddr = await ah.adjudicator();
+      adjAddr.should.equal(adj);
   });
 
-  async function assertHoldings(id: string, amount: BN) {
-    let c = await ah.holdings(id);
+  async function assertHoldings(fid: string, amount: BN) {
+    let c = await ah.holdings(fid);
     assert(amount.eq(c), "Wrong holdings");
   }
 
   it("set outcome of asset holder not from adjudicator", async () => {
-    await truffleAssert.reverts(
-      ah.setOutcome(channelID, parts, newBalances, [], [], {from: parts[A]}),
+    return truffleAssert.reverts(
+      ah.setOutcome(channelID, parts, finalBalance, [], [], {from: parts[A]}),
     );
   });
 
-  describe("Funding...", () => {
-    it("A deposits 9 eth into a channel", async () => {
-      let id = fundingID(channelID, parts[A]);
+  function testDeposit(idx: number, amount = balance[idx], cid = channelID) {
+    let fid = fundingID(cid, parts[idx]);
+    it(name[idx] + " deposits " + wei2eth(amount) + " eth", async () => {
+      console.log("deposit fid:" + fid + ", amount: " + amount);
+      let oldBal = await ah.holdings(fid);
       truffleAssert.eventEmitted(
-        await ah.deposit(id, ether(9), {value: ether(9), from: parts[A]}),
+        await ah.deposit(fid, amount, {value: amount, from: recv[idx]}),
         'Deposited',
-        (ev: any) => {return ev.fundingID == id; }
+        (ev: any) => {
+          return ev.fundingID == fid && ev.amount.eq(amount);
+        }
       );
-      assertHoldings(id, ether(9));
+      return assertHoldings(fid, amount.add(oldBal));
     });
+  }
 
-    it("B deposits 20 eth into a channel", async () => {
-      let id = fundingID(channelID, parts[B]);
-      let amount = balance[B];
+  function testWithdraw(idx: number, amount = finalBalance[idx], cid = channelID) {
+    let fid = fundingID(cid, parts[idx]);
+    it(name[idx] + " withdraws " + wei2eth(amount) + " eth with valid allowance", async () => {
+      console.log("withdraw fid:" + fid + ", amount: " + amount);
+      let balanceBefore = toBN(await web3.eth.getBalance(recv[idx]));
+      let authorization = new Authorization(cid, parts[idx], recv[idx], amount.toString());
+      let signature = await sign(authorization.encode(), parts[idx]);
       truffleAssert.eventEmitted(
-        await ah.deposit(id, amount, {value: amount, from: parts[B]}),
-        'Deposited',
-        (ev: any) => { return ev.fundingID == id; }
+        await ah.withdraw(authorization, signature, {from: txSender}),
+        'Withdrawn',
+        (ev: any) => {
+          return ev.fundingID == fid
+            && amount.eq(ev.amount)
+            && ev.receiver == recv[idx];
+        }
       );
-      assertHoldings(id, amount);
+      let balanceAfter = toBN(await web3.eth.getBalance(recv[idx]));
+      assert(amount.add(balanceBefore).eq(balanceAfter), "wrong receiver balance");
     });
+  }
+
+  describe("Funding...", () => {
+
+    testDeposit(A, ether(9));
+
+    testDeposit(B);
 
     it("A sends too little money with call", async () => {
       let id = fundingID(channelID, parts[A]);
@@ -103,56 +132,48 @@ contract("AssetHolderETH", async (accounts) => {
       assertHoldings(id, ether(9));
     });
 
-    it("A tops up their channel with 1 eth", async () => {
-      let id = fundingID(channelID, parts[A]);
-      truffleAssert.eventEmitted(
-        await ah.deposit(id, ether(1), {value: ether(1), from: parts[A]}),
-        'Deposited',
-        (ev: any) => { return ev.fundingID == id; }
-      );
-      assertHoldings(id, balance[A]);
-    });
+    testDeposit(A, ether(1));
   })
 
   snapshot("Set outcome", () => {
     it("set outcome from wrong origin", async () => {
-      assert(newBalances.length == parts.length);
+      assert(finalBalance.length == parts.length);
       assert(await ah.settled(channelID) == false);
       await truffleAssert.reverts(
-        ah.setOutcome(channelID, parts, newBalances, [], [], {from: accounts[3]}),
+        ah.setOutcome(channelID, parts, finalBalance, [], [], {from: txSender}),
       );
     });
   })
 
   describe("Setting outcome", () => {
     it("set outcome of the asset holder", async () => {
-      assert(newBalances.length == parts.length);
+      assert(finalBalance.length == parts.length);
       assert(await ah.settled(channelID) == false);
       truffleAssert.eventEmitted(
-        await ah.setOutcome(channelID, parts, newBalances, [], [], {from: accounts[0]}),
+        await ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj}),
         'OutcomeSet' ,
         (ev: any) => { return ev.channelID == channelID }
       );
       assert(await ah.settled(channelID) == true);
       for (var i = 0; i < parts.length; i++) {
         let id = fundingID(channelID, parts[i]);
-        await assertHoldings(id, newBalances[i]);
+        await assertHoldings(id, finalBalance[i]);
       }
     });
 
     it("set outcome of asset holder twice", async () => {
       await truffleAssert.reverts(
-        ah.setOutcome(channelID, parts, newBalances, [], [], {from: accounts[0]})
+        ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj})
       );
     });
   })
 
   snapshot("Invalid withdrawals", () => {
     it("withdraw with invalid signature", async () => {
-      let authorization = new Authorization(channelID, parts[A], parts[B], newBalances[A].toString());
+      let authorization = new Authorization(channelID, parts[A], parts[B], finalBalance[A].toString());
       let signature = await sign(authorization.encode(), parts[B]);
       await truffleAssert.reverts(
-        ah.withdraw(authorization, signature, {from: accounts[3]})
+        ah.withdraw(authorization, signature, {from: txSender})
       );
     });
 
@@ -160,94 +181,54 @@ contract("AssetHolderETH", async (accounts) => {
       let authorization = new Authorization(channelID, parts[A], parts[B], ether(30).toString());
       let signature = await sign(authorization.encode(), parts[A]);
       await truffleAssert.reverts(
-        ah.withdraw(authorization, signature, {from: accounts[3]})
+        ah.withdraw(authorization, signature, {from: txSender})
       );
     });
   })
 
   describe("Withdraw", () => {
-    it("A withdraws with valid allowance 20 eth", async () => {
-      let balanceBefore = await web3.eth.getBalance(parts[A]);
-      let authorization = new Authorization(channelID, parts[A], parts[A], newBalances[A].toString());
-      let signature = await sign(authorization.encode(), parts[A]);
-      truffleAssert.eventEmitted(
-        await ah.withdraw(authorization, signature, {from: accounts[3]}),
-        'Withdrawn',
-        (ev: any) => { return ev.amount == newBalances[A].toString(); }
-      );
-      let balanceAfter = await web3.eth.getBalance(parts[A]);
-      assert(toBN(balanceBefore).add(ether(20)).eq(toBN(balanceAfter)));
-    });
 
-    it("B withdraws with valid allowance 10 eth", async () => {
-      let balanceBefore = await web3.eth.getBalance(parts[B]);
-      let authorization = new Authorization(channelID, parts[B], parts[B], newBalances[B].toString());
-      let signature = await sign(authorization.encode(), parts[B]);
-      truffleAssert.eventEmitted(
-        await ah.withdraw(authorization, signature, {from: accounts[3]}),
-        'Withdrawn',
-        (ev: any) => { return ev.amount == newBalances[B].toString(); }
-      );
-      let balanceAfter = await web3.eth.getBalance(parts[B]);
-      assert(toBN(balanceBefore).add(ether(10)).eq(toBN(balanceAfter)));
-    });
+    testWithdraw(A);
 
-    it("overdraw with valid allowance", async () => {
-      let authorization = new Authorization(channelID, parts[A], parts[B], newBalances[A].toString());
+    testWithdraw(B);
+
+    it("A fails to overdraw with valid allowance", async () => {
+      let authorization = new Authorization(channelID, parts[A], recv[A], finalBalance[A].toString());
       let signature = await sign(authorization.encode(), parts[A]);
-      await truffleAssert.reverts(
-        ah.withdraw(authorization, signature, {from: accounts[3]})
+      return truffleAssert.reverts(
+        ah.withdraw(authorization, signature, {from: txSender})
       );
     });
   })
 
   describe("Test underfunded channel", () => {
     // check withdrawal after a party refuses to deposit funds into asset holder
-    let channelID = hash("12345");
+    let channelID = hash("5678");
 
-    it("A deposits 1 eth into a channel", async () => {
-      let id = fundingID(channelID, parts[A]);
-      truffleAssert.eventEmitted(
-        await ah.deposit(id, ether(1), {value: ether(1), from: accounts[3]}),
-        'Deposited',
-        (ev: any) => {return ev.fundingID == id; }
-      );
-      assertHoldings(id, ether(1));
-    });
+    testDeposit(A, ether(1), channelID);
 
     it("set outcome of the asset holder with deposit refusal", async () => {
-      assert(newBalances.length == parts.length);
+      assert(finalBalance.length == parts.length);
       assert(await ah.settled(channelID) == false);
       truffleAssert.eventEmitted(
-        await ah.setOutcome(channelID, parts, newBalances, [], [], {from: accounts[0]}),
+        await ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj}),
         'OutcomeSet',
         (ev: any) => { return ev.channelID == channelID; }
       );
-      assert(await ah.settled(channelID) == true);
+      assert(await ah.settled(channelID), "channel not settled");
       let id = fundingID(channelID, parts[A]);
       assertHoldings(id, ether(1));
     });
 
     it("A fails to withdraw 2 eth after B's deposit refusal", async () => {
-      let authorization = new Authorization(channelID, parts[A], parts[A], ether(2).toString());
+      let authorization = new Authorization(channelID, parts[A], recv[A], ether(2).toString());
       let signature = await sign(authorization.encode(), parts[A]);
       await truffleAssert.reverts(
-        ah.withdraw(authorization, signature, {from: accounts[3]})
+        ah.withdraw(authorization, signature, {from: txSender})
       );
     });
 
-    it("A withdraws 1 eth after B's deposit refusal", async () => {
-      let balanceBefore = await web3.eth.getBalance(parts[A]);
-      let authorization = new Authorization(channelID, parts[A], parts[A], ether(1).toString());
-      let signature = await sign(authorization.encode(), parts[A]);
-      truffleAssert.eventEmitted(
-        await ah.withdraw(authorization, signature, {from: accounts[3]}),
-        'Withdrawn',
-        (ev: any) => { return ev.amount == ether(1).toString(); }
-      );
-      let balanceAfter = await web3.eth.getBalance(parts[A]);
-      assert(toBN(balanceBefore).add(ether(1)).eq(toBN(balanceAfter)));
-    });
+    testWithdraw(A, ether(1), channelID);
   })
 
 });
