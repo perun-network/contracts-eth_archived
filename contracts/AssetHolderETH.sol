@@ -54,6 +54,6 @@ contract AssetHolderETH is AssetHolder {
         // Decrease holdings, then transfer the money.
         holdings[id] = holdings[id].sub(authorization.amount);
         authorization.receiver.transfer(authorization.amount);
-        emit Withdrawn(authorization.participant, authorization.amount);
+        emit Withdrawn(id, authorization.amount, authorization.receiver);
     }
 }
