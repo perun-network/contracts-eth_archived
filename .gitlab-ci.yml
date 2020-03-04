@@ -10,7 +10,7 @@ cache:
   - build/
 
 solium:
-  image: node:10
+  image: node:latest
   stage: lint
   before_script:
     - npm install -g ethlint
@@ -19,7 +19,7 @@ solium:
   allow_failure: false
 
 solhint:
-  image: node:10
+  image: node:latest
   stage: lint
   before_script:
     - npm install -g solhint
@@ -28,12 +28,9 @@ solhint:
   allow_failure: false
 
 build:
-  image: node:10
+  image: node:latest
   stage: build
   before_script:
-    - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-    - echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-    - apt-get update && apt-get install -y yarn
     - yarn global add truffle typescript
   script:
     - yarn install
@@ -42,12 +39,9 @@ build:
   allow_failure: false
 
 coverage:
-  image: node:10
+  image: node:latest
   stage: security
   before_script:
-    - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-    - echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-    - apt-get update && apt-get install -y yarn
     - yarn global add truffle typescript
   script:
     - yarn install
@@ -57,13 +51,12 @@ coverage:
 
 
 mythril:
-  image: "python:3.7"
+  image: python:3.7
   stage: security
   before_script:
     - pip3 install mythril
   script:
     - myth truffle
-  allow_failure: false
   only:
     changes:
         - contracts/*
