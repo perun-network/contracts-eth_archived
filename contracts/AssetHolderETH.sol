@@ -20,12 +20,11 @@ contract AssetHolderETH is AssetHolder {
     using SafeMath for uint256;
 
     /**
-     * @notice Constructs a new instance of this contract.
-     * @param _adjudicator The address of the adjudicator singleton contract.
+     * @notice Sets the adjudicator contract by calling the constructor of the
+     * base asset holder contract.
+     * @param _adjudicator Address of the adjudicator contract.
      */
-    constructor(address _adjudicator) public {
-        adjudicator = _adjudicator;
-    }
+    constructor(address _adjudicator) public AssetHolder(_adjudicator) {} // solhint-disable-line no-empty-blocks
 
     /**
      * @notice Used to deposit money into a channel.
@@ -46,7 +45,7 @@ contract AssetHolderETH is AssetHolder {
      * from an ephemeral key to an on-chain key.
      * @param signature Signature on the withdrawal authorization
      */
-    function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public {
+    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external {
         require(settled[authorization.channelID], "channel not settled");
         require(Sig.verify(abi.encode(authorization), signature, authorization.participant),
                 "signature verification failed");
@@ -55,6 +54,6 @@ contract AssetHolderETH is AssetHolder {
         // Decrease holdings, then transfer the money.
         holdings[id] = holdings[id].sub(authorization.amount);
         authorization.receiver.transfer(authorization.amount);
-        emit Withdrawn(authorization.participant, authorization.amount);
+        emit Withdrawn(id, authorization.amount, authorization.receiver);
     }
 }

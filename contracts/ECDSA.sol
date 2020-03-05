@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.8;
 
 /**
  * @dev Elliptic Curve Digital Signature Algorithm (ECDSA) operations.
@@ -39,7 +39,7 @@ library ECDSA {
         // ecrecover takes the signature parameters, and the only way to get them
         // currently is to use assembly.
         // solhint-disable-next-line no-inline-assembly
-        assembly {
+        assembly { // solium-disable-line security/no-inline-assembly
             r := mload(add(signature, 0x20))
             s := mload(add(signature, 0x40))
             v := byte(0, mload(add(signature, 0x60)))
