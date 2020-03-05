@@ -32,7 +32,7 @@ library Channel {
 
     struct SubAlloc {
         // ID is the channelID of the subchannel
-        bytes32 ID;
+        bytes32 ID; // solhint-disable-line var-name-mixedcase
         // balances holds the total balance of the subchannel of every asset.
         uint256[] balances;
     }

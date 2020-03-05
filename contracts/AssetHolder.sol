@@ -28,7 +28,7 @@ contract AssetHolder {
 
     event OutcomeSet(bytes32 indexed channelID);
     event Deposited(bytes32 indexed fundingID, uint256 amount);
-    event Withdrawn(address indexed participant, uint256 amount);
+    event Withdrawn(bytes32 indexed fundingID, uint256 amount, address receiver);
 
     /**
      * @notice This mapping stores the balances of participants to their fundingID.
@@ -43,22 +43,30 @@ contract AssetHolder {
     mapping(bytes32 => bool) public settled;
 
     /**
-     * @notice adjudicator stores the address of the adjudicator contract that can call setOutcome().
-     * @dev This should only be set in the constructor of the implementing contract.
+     * @notice Address of the adjudicator contract that can call setOutcome.
+     * @dev Set by the constructor.
      */
-    address public adjudicator = address(0);
+    address public adjudicator;
 
     /**
      * @notice The onlyAdjudicator modifier specifies functions that can only be called from the adjudicator contract.
      */
     modifier onlyAdjudicator {
         require(msg.sender == adjudicator,
-            "This method can only be called by the adjudicator contract");
+            "can only be called by the adjudicator");
         _;
     }
 
     /**
-     * @notice Sets the final outcome of a channel, can only be called by the adjudicator.
+     * @notice Sets the adjudicator contract that is able to call setOutcome on this contract.
+     * @param _adjudicator Address of the adjudicator contract.
+     */
+    constructor(address _adjudicator) internal {
+        adjudicator = _adjudicator;
+    }
+
+    /**
+     * @notice Sets the final outcome of a channel. Can only be called by the adjudicator.
      * @dev This method should not be overwritten by the implementing contract.
      * @param channelID ID of the channel that should be disbursed.
      * @param parts Array of participants of the channel.
@@ -105,6 +113,24 @@ contract AssetHolder {
     }
 
     /**
+     * @notice Function that is used to fund a channel.
+     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
+     * @param fundingID Unique identifier for a participant in a channel.
+     * Calculated as the hash of the channel id and the participant address.
+     * @param amount Amount of money that should be deposited.
+     */
+    function deposit(bytes32 fundingID, uint256 amount) external payable;
+
+    /**
+     * @notice Sends money from authorization.participant to authorization.receiver.
+     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
+     * @param authorization WithdrawalAuth that specifies which account receives
+     * what amounf of asset from which channel participant.
+     * @param signature Signature on the withdrawal authorization.
+     */
+    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external;
+
+    /**
      * @notice Internal helper function that calculates the fundingID.
      * @param channelID ID of the channel.
      * @param participant Address of a participant in the channel.
@@ -113,20 +139,4 @@ contract AssetHolder {
     function calcFundingID(bytes32 channelID, address participant) internal pure returns (bytes32) {
         return keccak256(abi.encode(channelID, participant));
     }
-
-    /**
-     * @notice Function that is used to fund a channel.
-     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
-     * @param fundingID Unique identifier for a participant in a channel.
-     * @param amount Amount of money that should be deposited.
-     */
-    function deposit(bytes32 fundingID, uint256 amount) external payable;
-
-    /**
-     * @notice Sends money from authorization.participant to authorization.receiver.
-     * @dev Abstract function that should be implemented in the concrete AssetHolder implementation.
-     * @param authorization WithdrawalAuth struct that is used to send money from an ephemeral key to an on-chain key.
-     * @param signature Signature on the withdrawal authorization.
-     */
-    function withdraw(WithdrawalAuth memory authorization, bytes memory signature) public;
 }

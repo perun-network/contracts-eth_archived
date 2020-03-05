@@ -28,7 +28,7 @@ contract TrivialApp is App {
         Channel.State calldata to,
         uint256 actorIdx)
     external pure
-    {
+    { // solhint-disable-line no-empty-blocks
         // Do nothing, don't revert
     }
 }
