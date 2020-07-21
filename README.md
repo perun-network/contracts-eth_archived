@@ -51,8 +51,7 @@ $ yarn test
 ```
 
 ## Copyright
-Copyright &copy; 2019 Chair of Applied Cryptography, Technische Universität Darmstadt, Germany.
-All rights reserved.
-Use of the source code is governed by a MIT-style license that can be found in the [LICENSE file](LICENSE).
+Copyright 2020 - See [NOTICE](NOTICE) file for copyright holders.
+Use of the source code is governed by the Apache 2.0 license that can be found in the [LICENSE file](LICENSE).
 
 Contact us at [info@perun.network](mailto:info@perun.network).
