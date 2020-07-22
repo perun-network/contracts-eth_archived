@@ -16,7 +16,7 @@ copyright:
     - .scripts/check-copyright-notice.sh
 
 solium:
-  image: node:latest
+  image: node:12
   stage: lint
   before_script:
     - npm install -g ethlint
@@ -25,7 +25,7 @@ solium:
   allow_failure: false
 
 solhint:
-  image: node:latest
+  image: node:12
   stage: lint
   before_script:
     - npm install -g solhint
@@ -34,7 +34,7 @@ solhint:
   allow_failure: false
 
 build:
-  image: node:latest
+  image: node:12
   stage: build
   script:
     - yarn global add truffle typescript
@@ -44,7 +44,7 @@ build:
   allow_failure: false
 
 coverage:
-  image: node:latest
+  image: node:12
   stage: security
   script:
     - yarn global add truffle typescript

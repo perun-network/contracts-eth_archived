@@ -42,7 +42,7 @@ When a channel state is progressed on-chain on the Adjudicator by calling `progr
 It is assumed to revert if any app-specific check fails.
 
 ## Testing
-All contracts are developed and tested using the [Truffle Framework](truffleframework.com/).
+Typescript and [Truffle](https://truffleframework.com/) (version 5.1.x) are expected to be installed globally, e.g. with `yarn global add` or your distribution's package manager.  
 To run the tests, run
 ```sh
 $ yarn
