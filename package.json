@@ -8,7 +8,7 @@
     "chai": "^4.2.0",
     "openzeppelin-solidity": "^2.1.2",
     "truffle-assertions": "^0.7.2",
-    "typechain": "^0.3.11",
+    "typechain": "^2.0.0",
     "web3": "^1.2.6"
   },
   "scripts": {
