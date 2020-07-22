@@ -9,7 +9,7 @@
     "openzeppelin-solidity": "^2.1.2",
     "truffle-assertions": "^0.7.2",
     "typechain": "^0.3.11",
-    "web3": "^1.2.6"
+    "web3": "^1.2.11"
   },
   "scripts": {
     "build:contracts": "truffle compile",
