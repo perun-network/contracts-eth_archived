@@ -1,4 +1,5 @@
 stages:
+  - vet
   - lint
   - build
   - security
@@ -6,11 +7,16 @@ cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
   - node_modules/
-  - .yarn/
   - build/
 
+copyright:
+  stage: vet
+  script:
+    - .scripts/check-notice-authors.sh origin/master
+    - .scripts/check-copyright-notice.sh
+
 solium:
-  image: node:latest
+  image: node:12
   stage: lint
   before_script:
     - npm install -g ethlint
@@ -19,7 +25,7 @@ solium:
   allow_failure: false
 
 solhint:
-  image: node:latest
+  image: node:12
   stage: lint
   before_script:
     - npm install -g solhint
@@ -28,23 +34,21 @@ solhint:
   allow_failure: false
 
 build:
-  image: node:latest
+  image: node:12
   stage: build
-  before_script:
-    - yarn global add truffle typescript
   script:
-    - yarn install
+    - yarn global add truffle typescript
+    - yarn install --pure-lockfile
     - yarn build
     - yarn test
   allow_failure: false
 
 coverage:
-  image: node:latest
+  image: node:12
   stage: security
-  before_script:
-    - yarn global add truffle typescript
   script:
-    - yarn install
+    - yarn global add truffle typescript
+    - yarn install --pure-lockfile
     - yarn build
     - yarn run solidity-coverage
   allow_failure: true
