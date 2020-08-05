@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pragma solidity ^0.5.17;
+pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 import "./AssetHolder.sol";
 import "./Sig.sol";
@@ -42,7 +42,7 @@ contract AssetHolderETH is AssetHolder {
      * @param fundingID Unique identifier for a participant in a channel.
      * @param amount Amount of money that should be deposited.
      */
-    function deposit(bytes32 fundingID, uint256 amount) external payable {
+    function deposit(bytes32 fundingID, uint256 amount) external payable override {
         require(msg.value == amount, "wrong amount of ETH for deposit");
         holdings[fundingID] = holdings[fundingID].add(amount);
         emit Deposited(fundingID, amount);
@@ -54,7 +54,7 @@ contract AssetHolderETH is AssetHolder {
      * from an ephemeral key to an on-chain key.
      * @param signature Signature on the withdrawal authorization
      */
-    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external {
+    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external override {
         require(settled[authorization.channelID], "channel not settled");
         require(Sig.verify(abi.encode(authorization), signature, authorization.participant),
                 "signature verification failed");

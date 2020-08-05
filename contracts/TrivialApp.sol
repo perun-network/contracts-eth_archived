@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pragma solidity ^0.5.17;
+pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./Channel.sol";
@@ -36,7 +36,7 @@ contract TrivialApp is App {
         Channel.State calldata from,
         Channel.State calldata to,
         uint256 actorIdx)
-    external pure
+    external pure override
     { // solhint-disable-line no-empty-blocks
         // Do nothing, don't revert
     }

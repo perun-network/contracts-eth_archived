@@ -80,7 +80,7 @@ contract("AssetHolderETH", async (accounts) => {
   });
 
   async function assertHoldings(fid: string, amount: BN) {
-    let c = await ah.holdings(fid);
+    let c = await ah.holdings.call(fid);
     assert(amount.eq(c), "Wrong holdings");
   }
 
@@ -94,7 +94,7 @@ contract("AssetHolderETH", async (accounts) => {
     let fid = fundingID(cid, parts[idx]);
     it(name[idx] + " deposits " + wei2eth(amount) + " eth", async () => {
       console.log("deposit fid:" + fid + ", amount: " + amount);
-      let oldBal = await ah.holdings(fid);
+      let oldBal = await ah.holdings.call(fid);
       truffleAssert.eventEmitted(
         await ah.deposit(fid, amount, {value: amount, from: recv[idx]}),
         'Deposited',
@@ -147,7 +147,7 @@ contract("AssetHolderETH", async (accounts) => {
   snapshot("Set outcome", () => {
     it("set outcome from wrong origin", async () => {
       assert(finalBalance.length == parts.length);
-      assert(await ah.settled(channelID) == false);
+      assert(await ah.settled.call(channelID) == false);
       await truffleAssert.reverts(
         ah.setOutcome(channelID, parts, finalBalance, [], [], {from: txSender}),
       );
@@ -157,13 +157,13 @@ contract("AssetHolderETH", async (accounts) => {
   describe("Setting outcome", () => {
     it("set outcome of the asset holder", async () => {
       assert(finalBalance.length == parts.length);
-      assert(await ah.settled(channelID) == false);
+      assert(await ah.settled.call(channelID) == false);
       truffleAssert.eventEmitted(
         await ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj}),
         'OutcomeSet' ,
         (ev: any) => { return ev.channelID == channelID }
       );
-      assert(await ah.settled(channelID) == true);
+      assert(await ah.settled.call(channelID) == true);
       for (var i = 0; i < parts.length; i++) {
         let id = fundingID(channelID, parts[i]);
         await assertHoldings(id, finalBalance[i]);
@@ -218,7 +218,7 @@ contract("AssetHolderETH", async (accounts) => {
 
     it("set outcome of the asset holder with deposit refusal", async () => {
       assert(finalBalance.length == parts.length);
-      assert(await ah.settled(channelID) == false);
+      assert(await ah.settled.call(channelID) == false);
       truffleAssert.eventEmitted(
         await ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj}),
         'OutcomeSet',
