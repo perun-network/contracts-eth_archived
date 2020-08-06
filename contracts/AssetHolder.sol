@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pragma solidity ^0.5.17;
+pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 import "../vendor/SafeMath.sol";
 
@@ -21,7 +21,7 @@ import "../vendor/SafeMath.sol";
  * @author The Perun Authors
  * @dev AssetHolder is an abstract contract that holds the funds for a Perun state channel.
  */
-contract AssetHolder {
+abstract contract AssetHolder {
 
     using SafeMath for uint256;
 
@@ -128,7 +128,7 @@ contract AssetHolder {
      * Calculated as the hash of the channel id and the participant address.
      * @param amount Amount of money that should be deposited.
      */
-    function deposit(bytes32 fundingID, uint256 amount) external payable;
+    function deposit(bytes32 fundingID, uint256 amount) external payable virtual;
 
     /**
      * @notice Sends money from authorization.participant to authorization.receiver.
@@ -137,7 +137,7 @@ contract AssetHolder {
      * what amounf of asset from which channel participant.
      * @param signature Signature on the withdrawal authorization.
      */
-    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external;
+    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external virtual;
 
     /**
      * @notice Internal helper function that calculates the fundingID.

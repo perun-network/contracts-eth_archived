@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pragma solidity ^0.5.17;
+pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "./Channel.sol";
@@ -102,7 +102,7 @@ contract Adjudicator {
         require(state.channelID == channelID, "invalid channelID");
         require(state.version > disputes[channelID].version , "can only refute with newer state");
         // solhint-disable-next-line not-rely-on-time
-        require(disputes[channelID].timeout > now, "timeout passed");
+        require(disputes[channelID].timeout > block.timestamp, "timeout passed");
         require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE),
                 "channel must be in DISPUTE phase");
         validateSignatures(params, state, sigs);
@@ -136,7 +136,7 @@ contract Adjudicator {
         bytes32 channelID = calcChannelID(params);
         if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
             // solhint-disable-next-line not-rely-on-time
-            require(disputes[channelID].timeout <= now, "timeout not passed yet");
+            require(disputes[channelID].timeout <= block.timestamp, "timeout not passed yet");
         } else {
             require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC),
                     "channel must be in FORCEEXEC phase");
@@ -164,7 +164,7 @@ contract Adjudicator {
     {
         bytes32 channelID = calcChannelID(params);
         // solhint-disable-next-line not-rely-on-time
-        require(disputes[channelID].timeout <= now, "timeout not passed yet");
+        require(disputes[channelID].timeout <= block.timestamp, "timeout not passed yet");
         require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "wrong old state");
 
         _conclude(channelID, params, state);
@@ -225,7 +225,7 @@ contract Adjudicator {
         // We require empty subAllocs because they are not implemented yet.
         require(state.outcome.locked.length == 0, "not implemented yet");
         // solhint-disable-next-line not-rely-on-time
-        uint256 timeout = now.add(params.challengeDuration);
+        uint256 timeout = block.timestamp.add(params.challengeDuration);
         disputes[channelID].stateHash = keccak256(abi.encode(state));
         disputes[channelID].timeout = uint64(timeout);
         disputes[channelID].disputePhase = uint8(disputePhase);

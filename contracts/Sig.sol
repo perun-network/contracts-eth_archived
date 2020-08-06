@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pragma solidity ^0.5.17;
+pragma solidity ^0.7.0;
 import "../vendor/ECDSA.sol";
 
 // Sig is a library to verify signatures.
@@ -22,7 +22,6 @@ library Sig {
     function verify(bytes memory data, bytes memory signature, address signer) internal pure returns (bool) {
         bytes32 prefixedHash = ECDSA.toEthSignedMessageHash(keccak256(data));
         address recoveredAddr = ECDSA.recover(prefixedHash, signature);
-        require(recoveredAddr != address(0));
         return recoveredAddr == signer;
     }
 }

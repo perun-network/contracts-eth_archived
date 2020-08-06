@@ -1,7 +1,7 @@
 stages:
   - vet
   - lint
-  - build
+  - test
   - security
 cache:
   key: ${CI_COMMIT_REF_SLUG}
@@ -12,56 +12,48 @@ cache:
 copyright:
   stage: vet
   script:
-    - .scripts/check-notice-authors.sh origin/master
+    - .scripts/check-notice-authors.sh $(git log --pretty=format:"%H" --merges -n 1)
     - .scripts/check-copyright-notice.sh
 
 solium:
   image: node:12
   stage: lint
-  before_script:
-    - npm install -g ethlint
   script:
+    - npm install -g ethlint
     - solium -d contracts/
-  allow_failure: false
+  allow_failure: true
 
 solhint:
   image: node:12
   stage: lint
-  before_script:
+  script:
     - npm install -g solhint
-  script:
     - solhint "contracts/**/*.sol"
-  allow_failure: false
 
-build:
+test:
   image: node:12
-  stage: build
+  stage: test
   script:
-    - yarn global add truffle typescript
+    - npm -g install truffle typescript
     - yarn install --pure-lockfile
     - yarn build
     - yarn test
-  allow_failure: false
 
 coverage:
   image: node:12
   stage: security
   script:
-    - yarn global add truffle typescript
+    - npm -g install truffle typescript
     - yarn install --pure-lockfile
     - yarn build
-    - yarn run solidity-coverage
-  allow_failure: true
-
+    - truffle run coverage
 
 mythril:
   image: python:3.7
   stage: security
-  before_script:
-    - pip3 install mythril
   script:
+    - pip3 install mythril
     - myth truffle
   only:
     changes:
-        - contracts/*
-  allow_failure: false
+      - contracts/*
