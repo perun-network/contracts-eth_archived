@@ -14,8 +14,8 @@
   "scripts": {
     "build:contracts": "truffle compile",
     "build:types": "typechain --target truffle './build/**/*.json'",
-    "fix:truffle-typings": "sed -i -e '0,/import/! s/= import/= typeof import/' node_modules/truffle-typings/index.d.ts",
-    "postbuild:types": "sed -i -e 's/BigNumber/BN/g' -e '/bignumber\\.js/d' types/truffle-contracts/index.d.ts",
+    "fix:truffle-typings": "sed -i.bak -e 's/= import(\"web3\")/= typeof import(\"web3\")/' node_modules/truffle-typings/index.d.ts",
+    "postbuild:types": "sed -i.bak -e 's/BigNumber/BN/g' -e '/bignumber\\.js/d' types/truffle-contracts/index.d.ts",
     "build:js": "tsc -p .",
     "build": "yarn build:contracts &&  yarn build:types && yarn fix:truffle-typings && yarn build:js",
     "test": "truffle test"
@@ -29,5 +29,6 @@
     "web3-eth": "^1.2.6",
     "web3-utils": "^1.2.6"
   },
-  "version": "0.0.0"
+  "version": "0.0.0",
+  "os": ["linux", "darwin"]
 }

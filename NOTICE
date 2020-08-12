@@ -22,9 +22,10 @@
 # Please keep the list in alphabetical order.
 
 Chair of Applied Cryptography, Technische Universität Darmstadt, Germany
-    Marius van der Wijden <marius@perun.network>
-    Oliver Tale-Yazdi <oliver@perun.network>
+    Matthias Geihs <matthias@perun.network>
     Sebastian Stammler <seb@perun.network>
+    Oliver Tale-Yazdi <oliver@perun.network>
+    Marius van der Wijden <marius@perun.network>
 
 zOS Global Limited
     OpenZeppelin <contact@openzeppelin.com>
