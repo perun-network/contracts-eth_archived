@@ -23,7 +23,6 @@ import "./Channel.sol";
  * @dev Every App that should be played in a state channel needs to implement this interface.
  */
 interface App {
-
     /**
      * @notice ValidTransition checks if there was a valid transition between two states.
      * @dev ValidTransition should revert on an invalid transition.

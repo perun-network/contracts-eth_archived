@@ -15,11 +15,11 @@
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
+import "../vendor/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "./Channel.sol";
 import "./App.sol";
 import "./AssetHolder.sol";
 import "./Sig.sol";
-import "../vendor/SafeMath.sol";
 import "../contracts/SafeMath64.sol";
 
 /**
