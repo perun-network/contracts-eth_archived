@@ -31,9 +31,10 @@ contract Adjudicator {
     using SafeMath for uint256;
 
     /**
-     * @dev Our state machine has two phases.
+     * @dev Our state machine has three phases.
      * In the DISPUTE phase, all parties have the ability to publish their latest state.
      * In the FORCEEXEC phase, the smart contract is executed on-chain.
+     * In the CONCLUDED phase, the channel is considered finalized.
      */
     enum DisputePhase { DISPUTE, FORCEEXEC, CONCLUDED }
 
@@ -75,9 +76,9 @@ contract Adjudicator {
     {
         bytes32 channelID = calcChannelID(params);
         require(state.channelID == channelID, "invalid channelID");
-        require(disputes[channelID].stateHash == bytes32(0), "state already registered");
+        require(disputes[channelID].stateHash == bytes32(0), "channel already registered");
         validateSignatures(params, state, sigs);
-        storeChallenge(params, state, channelID, DisputePhase.DISPUTE);
+        storeChallenge(params, state, DisputePhase.DISPUTE);
         emit Registered(channelID, state.version);
     }
 
@@ -100,13 +101,12 @@ contract Adjudicator {
     {
         bytes32 channelID = calcChannelID(params);
         require(state.channelID == channelID, "invalid channelID");
-        require(state.version > disputes[channelID].version , "can only refute with newer state");
+        require(state.version > disputes[channelID].version, "can only refute with newer state");
         // solhint-disable-next-line not-rely-on-time
         require(disputes[channelID].timeout > block.timestamp, "timeout passed");
-        require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE),
-                "channel must be in DISPUTE phase");
+        require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "channel must be in DISPUTE phase");
         validateSignatures(params, state, sigs);
-        storeChallenge(params, state, channelID, DisputePhase.DISPUTE);
+        storeChallenge(params, state, DisputePhase.DISPUTE);
         emit Refuted(channelID, state.version);
     }
 
@@ -138,46 +138,52 @@ contract Adjudicator {
             // solhint-disable-next-line not-rely-on-time
             require(disputes[channelID].timeout <= block.timestamp, "timeout not passed yet");
         } else {
-            require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC),
-                    "channel must be in FORCEEXEC phase");
+            require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC), "channel must be in FORCEEXEC");
         }
         require(state.channelID == channelID, "invalid channelID");
         require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "wrong old state");
-        require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]),
-            "actorIdx does not match signer's index");
+        require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]), "invalid signature");
         requireValidTransition(params, stateOld, state, actorIdx);
-        storeChallenge(params, state, channelID, DisputePhase.FORCEEXEC);
+        storeChallenge(params, state, DisputePhase.FORCEEXEC);
         emit Progressed(channelID, state.version);
     }
+
     /**
-     * @notice Conclude is used to finalize a channel on-chain.
-     * It can only be called after the timeout is over.
-     * If the call was successful, a Concluded event is emitted.
+     * @notice Function `conclude` concludes the channel identified by `params` including its subchannels and pushes the accumulated outcome to the assetholders.
+     * @dev Assumes:
+     * - subchannels of `subStates` have participants `params.participants`
+     * Requires:
+     * - channel not yet concluded
+     * - channel parameters valid
+     * - channel states valid and registered
+     * - dispute timeouts reached
+     * Emits:
+     * - event Concluded
      *
-     * @param params The parameters of the state channel.
-     * @param state The previously stored state of the state channel.
+     * @param params The parameters of the channel and its subchannels.
+     * @param state The previously stored state of the channel.
+     * @param subStates The previously stored states of the subchannels in depth-first order.
      */
     function conclude(
         Channel.Params memory params,
-        Channel.State memory state)
+        Channel.State memory state,
+        Channel.State[] memory subStates)
     public
     {
-        bytes32 channelID = calcChannelID(params);
-        // solhint-disable-next-line not-rely-on-time
-        require(disputes[channelID].timeout <= block.timestamp, "timeout not passed yet");
-        require(disputes[channelID].stateHash == keccak256(abi.encode(state)), "wrong old state");
+        require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
+        require(state.channelID == calcChannelID(params), "state and params mismatch");
 
-        _conclude(channelID, params, state);
+        ensureTreeConcluded(state, subStates);
+        pushOutcome(state, subStates, params.participants);
     }
 
     /**
-     * @notice ConcludeFinal can be used to immediately conclude a final state
-     * without registering it or waiting for a timeout.
-     * If the call was successful, a FinalConcluded and Concluded event is emitted.
+     * @notice Function `concludeFinal` immediately concludes the channel
+     * identified by `params` if the provided state is valid and final.
+     * The caller must provide signatures from all participants.
      * Since any fully-signed final state supersedes any ongoing dispute,
      * concludeFinal may skip any registered dispute.
-     *
-     * @dev The caller has to provide n signatures on the final state.
+     * The function emits events Concluded and FinalConcluded.
      *
      * @param params The parameters of the state channel.
      * @param state The current state of the state channel.
@@ -189,14 +195,18 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
+        require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
         require(state.isFinal == true, "state not final");
-        bytes32 channelID = calcChannelID(params);
-        require(state.channelID == channelID, "invalid channelID");
+        require(state.outcome.locked.length == 0, "cannot have sub-channels");
+        require(state.channelID == calcChannelID(params), "invalid channelID");
         validateSignatures(params, state, sigs);
 
-        _conclude(channelID, params, state);
+        storeChallenge(params, state, DisputePhase.CONCLUDED);
+        emit Concluded(state.channelID, state.version);
+        emit FinalConcluded(state.channelID);
 
-        emit FinalConcluded(channelID);
+        Channel.State[] memory subStates = new Channel.State[](0);
+        pushOutcome(state, subStates, params.participants);
     }
 
     /**
@@ -205,32 +215,34 @@ contract Adjudicator {
      * @return The channelID
      */
     function calcChannelID(Channel.Params memory params) internal pure returns (bytes32) {
-        return keccak256(abi.encode(params.challengeDuration, params.nonce, params.app, params.participants));
+        return keccak256(abi.encode(params));
     }
 
     /**
      * @dev Stores the provided challenge in the dipute registry
      * @param params The parameters of the state channel.
      * @param state The current state of the state channel.
-     * @param channelID The channelID of the state channel.
      * @param disputePhase The phase in which the state channel is currently.
      */
     function storeChallenge(
         Channel.Params memory params,
         Channel.State memory state,
-        bytes32 channelID,
         DisputePhase disputePhase)
     internal
     {
-        // We require empty subAllocs because they are not implemented yet.
-        require(state.outcome.locked.length == 0, "not implemented yet");
-        // solhint-disable-next-line not-rely-on-time
-        uint256 timeout = block.timestamp.add(params.challengeDuration);
-        disputes[channelID].stateHash = keccak256(abi.encode(state));
-        disputes[channelID].timeout = uint64(timeout);
-        disputes[channelID].disputePhase = uint8(disputePhase);
-        disputes[channelID].version = state.version;
-        emit Stored(channelID, state.version, uint64(timeout));
+        uint256 timeout;
+        if (state.isFinal) {
+            // solhint-disable-next-line not-rely-on-time
+            timeout = block.timestamp;
+        } else {
+            // solhint-disable-next-line not-rely-on-time
+            timeout = block.timestamp.add(params.challengeDuration);
+        }
+        disputes[state.channelID].stateHash = keccak256(abi.encode(state));
+        disputes[state.channelID].timeout = uint64(timeout);
+        disputes[state.channelID].disputePhase = uint8(disputePhase);
+        disputes[state.channelID].version = state.version;
+        emit Stored(state.channelID, state.version, uint64(timeout));
     }
 
     /**
@@ -249,7 +261,7 @@ contract Adjudicator {
         uint256 actorIdx)
     internal pure
     {
-        require(to.version == from.version + 1, "version counter must increment by one");
+        require(to.version == from.version + 1, "version must increment by one");
         require(from.isFinal == false, "cannot progress from final state");
         requireAssetPreservation(from.outcome, to.outcome, params.participants.length);
         App app = App(params.app);
@@ -257,7 +269,8 @@ contract Adjudicator {
     }
 
     /**
-     * @dev Checks if two allocations are compatible, e.g. if the sums of the allocations are equal.
+     * @dev Checks if two allocations are compatible, e.g. if the sums of the
+     * allocations are equal.
      * @param oldAlloc The old allocation.
      * @param newAlloc The new allocation.
      * @param numParts length of the participants in the parameters.
@@ -268,69 +281,138 @@ contract Adjudicator {
         uint256 numParts)
     internal pure
     {
-        require(oldAlloc.balances.length == newAlloc.balances.length,
-                "balances length mismatch");
-        require(oldAlloc.assets.length == newAlloc.assets.length,
-                "assets length mismatch");
+        require(oldAlloc.balances.length == newAlloc.balances.length, "balances length mismatch");
+        require(oldAlloc.assets.length == newAlloc.assets.length, "assets length mismatch");
+        require(oldAlloc.locked.length == 0, "funds locked in old state");
+        require(newAlloc.locked.length == 0, "funds locked in new state");
         for (uint256 i = 0; i < newAlloc.assets.length; i++) {
             require(oldAlloc.assets[i] == newAlloc.assets[i], "assets[i] address mismatch");
             uint256 sumOld = 0;
             uint256 sumNew = 0;
-            require(oldAlloc.balances[i].length == numParts,
-                    "oldAlloc: balances[i] length mismatch");
-            require(newAlloc.balances[i].length == numParts,
-                    "newAlloc: balances[i] length mismatch");
+            require(oldAlloc.balances[i].length == numParts, "old balances length mismatch");
+            require(newAlloc.balances[i].length == numParts, "new balances length mismatch");
             for (uint256 k = 0; k < numParts; k++) {
                 sumOld = sumOld.add(oldAlloc.balances[i][k]);
                 sumNew = sumNew.add(newAlloc.balances[i][k]);
             }
-            require(oldAlloc.locked.length == 0, "not implemented yet");
-            require(newAlloc.locked.length == 0, "not implemented yet");
+
             require(sumOld == sumNew, "sum of balances mismatch");
         }
     }
 
     /**
-     * @notice Concludes the channel by setting the outcome on all asset holder.
-     * @dev Called by conclude and concludeFinal. Records the channel as
-     * concluded so repeated conclude calls are not possible.
-     * @param channelID The unique identifier of the channel.
-     * @param params The parameters of the state channel.
-     * @param state The current state of the state channel.
+     * @notice Function `ensureTreeConcluded` checks that `state` and
+     * `substates` form a valid channel state tree and marks the corresponding
+     * channels as concluded. The substates must be in depth-first order.
+     * The function emits a Concluded event for every not yet concluded channel.
+     * @dev The function works recursively using `ensureTreeConcludedRecursive`
+     * and `ensureConcluded` as helper functions.
+     *
+     * @param state The previously stored state of the channel.
+     * @param subStates The previously stored states of the subchannels in
+     * depth-first order.
      */
-    function _conclude(
-        bytes32 channelID,
-        Channel.Params memory params,
-        Channel.State memory state)
+    function ensureTreeConcluded(
+        Channel.State memory state,
+        Channel.State[] memory subStates)
     internal
     {
-        require(disputes[channelID].disputePhase != uint8(DisputePhase.CONCLUDED),
-            "channel already concluded");
-        disputes[channelID].disputePhase = uint8(DisputePhase.CONCLUDED);
-        pushOutcome(channelID, params, state);
-        emit Concluded(channelID, state.version);
+        ensureConcluded(state);
+        uint256 index = ensureTreeConcludedRecursive(state, subStates, 0);
+        require(index == subStates.length, "wrong number of substates");
     }
 
     /**
-     * @notice Sets the outcome on all assetholder contracts.
-     * @param channelID The unique identifier of the channel.
-     * @param params The parameters of the state channel.
-     * @param state The current state of the state channel.
+     * @notice Function `ensureTreeConcludedRecursive` is a helper function for
+     * ensureTreeConcluded. It recursively checks the validity of the subchannel
+     * states given a parent channel state. It then sets the channels concluded.
+     * @param parentState The sub channels to be checked recursively.
+     * @param subStates The states of all subchannels in the tree in depth-first
+     * order.
+     * @param startIndex The index in subStates of the first item of
+     * subChannels.
+     * @return The index of the next state to be checked.
      */
-    function pushOutcome(
-        bytes32 channelID,
-        Channel.Params memory params,
+    function ensureTreeConcludedRecursive(
+        Channel.State memory parentState,
+        Channel.State[] memory subStates,
+        uint256 startIndex)
+    internal
+    returns (uint256)
+    {
+        uint256 channelIndex = startIndex;
+        Channel.SubAlloc[] memory locked = parentState.outcome.locked;
+        for (uint256 i = 0; i < locked.length; i++) {
+            Channel.State memory state = subStates[channelIndex];
+            require(locked[i].ID == state.channelID, "invalid channel ID");
+            ensureConcluded(state);
+
+            channelIndex++;
+            if (state.outcome.locked.length > 0) {
+                channelIndex = ensureTreeConcludedRecursive(state, subStates, channelIndex);
+            }
+        }
+        return channelIndex;
+    }
+
+    /**
+     * @notice Function `ensureConcluded` checks for the given state
+     * that it has been registered and its timeout is reached.
+     * It then sets the channel as concluded and emits event Concluded.
+     * @dev The function is a helper function for `ensureTreeConcluded`.
+     * @param state The state of the target channel.
+     */
+    function ensureConcluded(
         Channel.State memory state)
     internal
     {
-        uint256[][] memory balances = new uint256[][](state.outcome.assets.length);
-        bytes32[] memory subAllocs = new bytes32[](state.outcome.locked.length);
-        for (uint256 i = 0; i < state.outcome.assets.length; i++) {
-            AssetHolder a = AssetHolder(state.outcome.assets[i]);
-            require(state.outcome.balances[i].length == params.participants.length,
-                "balances[i] length mismatch");
-            // We set empty subAllocs because they are not implemented yet.
-            a.setOutcome(channelID, params.participants, state.outcome.balances[i], subAllocs, balances[i]);
+        require(disputes[state.channelID].stateHash == keccak256(abi.encode(state)), "invalid channel state");
+        if (disputes[state.channelID].disputePhase == uint8(DisputePhase.CONCLUDED)) { return; }
+
+        // solhint-disable-next-line not-rely-on-time
+        require(disputes[state.channelID].timeout <= block.timestamp, "timeout not passed yet");
+        disputes[state.channelID].disputePhase = uint8(DisputePhase.CONCLUDED);
+        emit Concluded(state.channelID, state.version);
+    }
+
+    /**
+     * @notice Function `pushOutcome` pushes the accumulated outcome of the
+     * channel identified by `state.channelID` and its subchannels referenced by
+     * `subStates` to the assetholder contracts.
+     * The following must be guaranteed when calling the function:
+     * - state and subStates conform with participants
+     * - the outcome has not been pushed yet
+     * @param state The state of the channel.
+     * @param subStates The states of the subchannels of the channel in
+     * depth-first order.
+     * @param participants The participants of the channel and the subchannels.
+     */
+    function pushOutcome(
+        Channel.State memory state,
+        Channel.State[] memory subStates,
+        address[] memory participants)
+    internal
+    {
+        address[] memory assets = state.outcome.assets;
+
+        for (uint256 a = 0; a < assets.length; a++) {
+            // accumulate outcome over channel and subchannels
+            uint256[] memory outcome = new uint256[](participants.length);
+            for (uint256 p = 0; p < outcome.length; p++) {
+                outcome[p] = state.outcome.balances[a][p];
+                for (uint256 s = 0; s < subStates.length; s++) {
+                    Channel.State memory subState = subStates[s];
+                    require(subState.outcome.assets[a] == assets[a], "assets do not match");
+
+                    // assumes participants at same index are the same
+                    uint256 acc = outcome[p];
+                    uint256 val = subState.outcome.balances[a][p];
+                    outcome[p] = acc.add(val);
+                }
+            }
+
+            // push accumulated outcome
+            AssetHolder(assets[a]).setOutcome(state.channelID, participants, outcome);
         }
     }
 

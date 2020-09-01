@@ -86,7 +86,7 @@ contract("AssetHolderETH", async (accounts) => {
 
   it("set outcome of asset holder not from adjudicator", async () => {
     return truffleAssert.reverts(
-      ah.setOutcome(channelID, parts, finalBalance, [], [], {from: parts[A]}),
+      ah.setOutcome(channelID, parts, finalBalance, {from: parts[A]}),
     );
   });
 
@@ -149,7 +149,7 @@ contract("AssetHolderETH", async (accounts) => {
       assert(finalBalance.length == parts.length);
       assert(await ah.settled.call(channelID) == false);
       await truffleAssert.reverts(
-        ah.setOutcome(channelID, parts, finalBalance, [], [], {from: txSender}),
+        ah.setOutcome(channelID, parts, finalBalance, {from: txSender}),
       );
     });
   })
@@ -159,7 +159,7 @@ contract("AssetHolderETH", async (accounts) => {
       assert(finalBalance.length == parts.length);
       assert(await ah.settled.call(channelID) == false);
       truffleAssert.eventEmitted(
-        await ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj}),
+        await ah.setOutcome(channelID, parts, finalBalance, {from: adj}),
         'OutcomeSet' ,
         (ev: any) => { return ev.channelID == channelID }
       );
@@ -172,7 +172,7 @@ contract("AssetHolderETH", async (accounts) => {
 
     it("set outcome of asset holder twice", async () => {
       await truffleAssert.reverts(
-        ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj})
+        ah.setOutcome(channelID, parts, finalBalance, {from: adj})
       );
     });
   })
@@ -220,7 +220,7 @@ contract("AssetHolderETH", async (accounts) => {
       assert(finalBalance.length == parts.length);
       assert(await ah.settled.call(channelID) == false);
       truffleAssert.eventEmitted(
-        await ah.setOutcome(channelID, parts, finalBalance, [], [], {from: adj}),
+        await ah.setOutcome(channelID, parts, finalBalance, {from: adj}),
         'OutcomeSet',
         (ev: any) => { return ev.channelID == channelID; }
       );
