@@ -47,9 +47,6 @@ library Channel {
     }
 
     function encodeState(State memory state) internal pure returns (bytes memory)  {
-        bytes memory subAlloc = "";
-        bytes memory outcome = abi.encode(state.outcome.assets, state.outcome.balances, subAlloc);
-        bytes memory stateEnc = abi.encode(state.channelID, state.version, outcome, state.appData, state.isFinal);
-        return stateEnc;
+        return abi.encode(state);
     }
 }

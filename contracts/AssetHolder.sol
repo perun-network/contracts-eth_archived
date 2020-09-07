@@ -80,19 +80,13 @@ abstract contract AssetHolder {
      * @param channelID ID of the channel that should be disbursed.
      * @param parts Array of participants of the channel.
      * @param newBals New Balances after execution of the channel.
-     * @param subAllocs currently not implemented.
-     * @param subBalances currently not implemented.
      */
     function setOutcome(
         bytes32 channelID,
         address[] calldata parts,
-        uint256[] calldata newBals,
-        bytes32[] calldata subAllocs,
-        uint256[] calldata subBalances)
+        uint256[] calldata newBals)
     external onlyAdjudicator {
         require(parts.length == newBals.length, "participants length should equal balances");
-        require(subAllocs.length == subBalances.length, "length of subAllocs and subBalances should be equal");
-        require(subAllocs.length == 0, "subAllocs currently not implemented");
         require(settled[channelID] == false, "trying to set already settled channel");
 
         // The channelID itself might already be funded

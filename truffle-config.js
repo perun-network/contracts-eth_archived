@@ -5,14 +5,20 @@ module.exports = {
         reporter: 'eth-gas-reporter',
         reporterOptions : {
             // See https://www.npmjs.com/package/eth-gas-reporter
-            gasPrice: 20,
+            // gasPrice: 300,
             onlyCalledMethods: false
         }
     },
 
     compilers: {
         solc: {
-            version: "^0.7.0"
+            version: "^0.7.0",
+            settings: {
+                optimizer: {
+                    enabled: true,
+                    runs: 200,
+                },
+            },
         }
     }
 }

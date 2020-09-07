@@ -37,14 +37,22 @@ export function snapshot(name: string, tests: any) {
   describe("Snapshot: " + name, () => {
     let snapshot_id: number;
 
-    before("take snapshot before all tests", async () => {
+    before("take snapshot before first test", async () => {
       snapshot_id = (await asyncWeb3Send('evm_snapshot', [])).result;
     });
 
-    after("restore snapshot after all test", async () => {
+    after("restore snapshot after last test", async () => {
       return asyncWeb3Send('evm_revert', [snapshot_id]);
     });
 
     tests();
+  });
+}
+
+export function itWithRevert(name: string, test: any) {
+  it(name, async () => {
+    let snapshot_id = (await asyncWeb3Send('evm_snapshot', [])).result;
+    await test();
+    await asyncWeb3Send('evm_revert', [snapshot_id]);
   });
 }
