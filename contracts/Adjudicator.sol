@@ -238,10 +238,12 @@ contract Adjudicator {
             // solhint-disable-next-line not-rely-on-time
             timeout = block.timestamp.add(params.challengeDuration);
         }
-        disputes[state.channelID].stateHash = keccak256(abi.encode(state));
-        disputes[state.channelID].timeout = uint64(timeout);
-        disputes[state.channelID].disputePhase = uint8(disputePhase);
-        disputes[state.channelID].version = state.version;
+        disputes[state.channelID] = Dispute({
+            stateHash: keccak256(abi.encode(state)),
+            timeout: uint64(timeout),
+            disputePhase: uint8(disputePhase),
+            version: state.version
+        });
         emit Stored(state.channelID, state.version, uint64(timeout));
     }
 
