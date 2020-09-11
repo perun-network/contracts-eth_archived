@@ -20,7 +20,7 @@ import Web3 from "web3";
 declare const web3: Web3;
 import { AssetHolderETHContract, AssetHolderETHInstance } from "../../types/truffle-contracts";
 import { sign, ether, wei2eth, hash } from "../lib/web3";
-import { fundingID, snapshot } from "../lib/test";
+import { fundingID, describeWithBlockRevert } from "../lib/test";
 
 const AssetHolderETH = artifacts.require<AssetHolderETHContract>("AssetHolderETH");
 const toBN = web3.utils.toBN;
@@ -144,7 +144,7 @@ contract("AssetHolderETH", async (accounts) => {
     testDeposit(A, ether(1));
   })
 
-  snapshot("Set outcome", () => {
+  describeWithBlockRevert("Set outcome", () => {
     it("set outcome from wrong origin", async () => {
       assert(finalBalance.length == parts.length);
       assert(await ah.settled.call(channelID) == false);
@@ -177,7 +177,7 @@ contract("AssetHolderETH", async (accounts) => {
     });
   })
 
-  snapshot("Invalid withdrawals", () => {
+  describeWithBlockRevert("Invalid withdrawals", () => {
     it("withdraw with invalid signature", async () => {
       let authorization = new Authorization(channelID, parts[A], parts[B], finalBalance[A].toString());
       let signature = await sign(authorization.encode(), parts[B]);
