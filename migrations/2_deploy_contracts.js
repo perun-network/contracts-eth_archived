@@ -12,8 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+var Adjudicator = artifacts.require("Adjudicator");
 var AssetHolderETH = artifacts.require("AssetHolderETH");
+var AssetHolderERC20 = artifacts.require("AssetHolderERC20");
+var PerunToken = artifacts.require("PerunToken");
 
-module.exports = function(deployer, network, accounts) {
-  deployer.deploy(AssetHolderETH, accounts[0]);
+module.exports = async function(deployer, _network, accounts) {
+  await deployer.deploy(Adjudicator);
+
+  await deployer.deploy(AssetHolderETH, Adjudicator.address);
+  await deployer.deploy(PerunToken, accounts, 1<<10);
+  await deployer.deploy(AssetHolderERC20, Adjudicator.address, PerunToken.address);
 };
