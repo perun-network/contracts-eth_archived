@@ -24,10 +24,9 @@ import {
   AssetHolderETHContract,
   AssetHolderETHInstance,
 } from "../../types/truffle-contracts";
-import { sign, ether, wei2eth, hash, asyncWeb3Send } from "../lib/web3";
-import { fundingID, snapshot, advanceBlockTime, itWithRevert } from "../lib/test";
+import { sign, ether, wei2eth, hash } from "../lib/web3";
+import { fundingID, describeWithBlockRevert, itWithBlockRevert, advanceBlockTime } from "../lib/test";
 import BN from "bn.js";
-import { numberToHex, stringToHex } from "web3-utils";
 
 const Adjudicator = artifacts.require<AdjudicatorContract>("Adjudicator");
 const TrivialApp = artifacts.require<TrivialAppContract>("TrivialApp");
@@ -199,6 +198,10 @@ class State {
   async sign(signers: string[]): Promise<string[]> {
     return Promise.all(signers.map(signer => sign(this.encode(), signer)))
   }
+
+  incrementVersion() {
+    this.version = (Number(this.version) + 1).toString()
+  }
 }
 
 class Allocation {
@@ -285,6 +288,16 @@ contract("Adjudicator", async (accounts) => {
     return adjcall(adj.register, tx);
   }
 
+  async function registerWithAssertions(channel: Channel) {
+    let res = adj.register(
+      channel.params.serialize(),
+      channel.state.serialize(),
+      await channel.state.sign(channel.params.participants),
+      {from: accounts[0]}
+    );
+    await assertRegister(res, channel);
+  }
+
   function refute(tx: Transaction): Promise<Truffle.TransactionResponse> {
     return adjcall(adj.refute, tx);
   }
@@ -329,8 +342,8 @@ contract("Adjudicator", async (accounts) => {
 
   async function assertDisputePhase(channelID: string, phase: DisputePhase) {
     const dispute = await adj.disputes.call(channelID)
-    const phaseIndex = 2
-    assert(dispute[phaseIndex].eqn(phase), "wrong channel phase")
+    const disputePhaseIndex = 4
+    assert(dispute[disputePhaseIndex].eqn(phase), "wrong channel phase")
   }
 
   async function assertRegister(res: Promise<Truffle.TransactionResponse>, channel: Channel) {
@@ -405,37 +418,37 @@ contract("Adjudicator", async (accounts) => {
   initialDeposit(A);
   initialDeposit(B);
 
-  snapshot("register and refute", () => {
+  describeWithBlockRevert("register and refute", () => {
     const testsRegister = [
       {
         prepare: async (tx: Transaction) => { tx.state.channelID = hash("wrongChannelID"); await tx.sign(parts) },
         desc: "register with invalid channelID fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign([parts[0]]) },
         desc: "register with wrong number of signatures fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign([parts[0], parts[0]]) },
         desc: "register with invalid signature fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
-        desc: "register with validState succeeds",
-        revert: false,
+        desc: "register with valid state succeeds",
+        shouldRevert: false,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "register with validState twice fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { tx.state.version = "3"; await tx.sign(parts) },
         desc: "register with higher version fails",
-        revert: true,
+        shouldRevert: true,
       }
     ]
 
@@ -445,7 +458,7 @@ contract("Adjudicator", async (accounts) => {
         tx.state.version = "2";
         await test.prepare(tx);
         let res = register(tx);
-        if (test.revert) {
+        if (test.shouldRevert) {
           await truffleAssert.reverts(res);
         } else {
           await assertRegister(res, tx);
@@ -457,32 +470,32 @@ contract("Adjudicator", async (accounts) => {
       {
         prepare: async (tx: Transaction) => { tx.state.channelID = hash("wrongChannelID"); await tx.sign(parts) },
         desc: "refuting with invalid channelID fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { tx.state.version = "2"; await tx.sign(parts) },
         desc: "refuting with old state fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign([parts[0], parts[0]]) },
         desc: "refuting with invalid signature fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "refuting with validState succeeds",
-        revert: false,
+        shouldRevert: false,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "refuting with validState twice fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { tx.state.version = "5"; await tx.sign(parts) },
         desc: "refuting with higher state succeeds",
-        revert: false,
+        shouldRevert: false,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -491,7 +504,7 @@ contract("Adjudicator", async (accounts) => {
           await advanceBlockTime(timeout + 10);
         },
         desc: "refute after timeout fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -506,7 +519,7 @@ contract("Adjudicator", async (accounts) => {
           await tx.sign(parts);
         },
         desc: "refute in FORCEEXEC fails",
-        revert: true,
+        shouldRevert: true,
       },
     ]
 
@@ -515,32 +528,37 @@ contract("Adjudicator", async (accounts) => {
         let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
         tx.state.version = "3";
         await test.prepare(tx);
+        let timeoutIndex = 0
+        let timeoutBefore = (await adj.disputes.call(tx.state.channelID))[timeoutIndex] as BN
         let res = refute(tx);
-        if (test.revert) {
+        if (test.shouldRevert) {
           await truffleAssert.reverts(res);
         } else {
           await assertRefute(res, tx);
+          //check timeout not changed programmatically in assertRefute?
+          let timeoutAfter = (await adj.disputes.call(tx.state.channelID))[timeoutIndex] as BN
+          assert(timeoutAfter.eq(timeoutBefore), "timeout must not change")
         }
       })
     });
   });
 
-  snapshot("concludeFinal", () => {
+  describeWithBlockRevert("concludeFinal", () => {
     const testsConcludeFinal = [
       {
         prepare: async (tx: Transaction) => { tx.state.channelID = hash("wrongChannelID"); await tx.sign(parts) },
         desc: "concludeFinal with invalid channelID fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { tx.state.isFinal = false; await tx.sign(parts) },
         desc: "concludeFinal with non-final state fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign([parts[0], parts[0]]) },
         desc: "concludeFinal with invalid signature fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -548,17 +566,17 @@ contract("Adjudicator", async (accounts) => {
           await tx.sign(parts)
         },
         desc: "concludeFinal with subchannels fails",
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "concludeFinal with valid state succeeds",
-        revert: false,
+        shouldRevert: false,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "concludeFinal with valid state twice fails",
-        revert: true,
+        shouldRevert: true,
       },
     ]
 
@@ -569,7 +587,7 @@ contract("Adjudicator", async (accounts) => {
         tx.state.isFinal = true;
         await test.prepare(tx);
         let res = concludeFinal(tx);
-        if (test.revert) {
+        if (test.shouldRevert) {
           await truffleAssert.reverts(res);
         } else {
           await assertConcludeFinal(res, tx);
@@ -578,7 +596,7 @@ contract("Adjudicator", async (accounts) => {
     });
   });
 
-  snapshot("conclude with subchannels", () => {
+  describeWithBlockRevert("conclude with subchannels", () => {
     /* Create channel tree
     *      root
     *     /    \
@@ -624,16 +642,6 @@ contract("Adjudicator", async (accounts) => {
       return (++nonceCounter).toString();
     }
 
-    async function registerWithAssertions(channel: Channel) {
-      let res = adj.register(
-        channel.params.serialize(),
-        channel.state.serialize(),
-        await channel.state.sign(channel.params.participants),
-        {from: accounts[0]}
-      );
-      await assertRegister(res, channel);
-    }
-
     before(async () => {
       subchannels = Array.from({length: 4}).map(_ => {
         let nonce = newNonce()
@@ -677,23 +685,23 @@ contract("Adjudicator", async (accounts) => {
       await assertConcludeFinal(res, subchannel);
     });
 
-    itWithRevert("conclude with wrong number of subchannels fails", async () => {
-      await advanceBlockTime(timeout + 10);
+    itWithBlockRevert("conclude with wrong number of subchannels fails", async () => {
+      await advanceBlockTime(2 * timeout + 1);
       let invalidSubchannels = subchannels.slice();
       invalidSubchannels.push(createInvalidSubchannel());
       let res = concludeWithSubchannels(ledgerChannel, invalidSubchannels);
-      await truffleAssert.reverts(res);
+      await truffleAssert.reverts(res, "wrong number of substates");
     });
 
-    itWithRevert("conclude with wrong subchannel ID fails", async () => {
-      await advanceBlockTime(timeout + 10);
+    itWithBlockRevert("conclude with wrong subchannel ID fails", async () => {
+      await advanceBlockTime(2 * timeout + 1);
       let invalidSubchannels = subchannels.slice();
       invalidSubchannels[0] = createInvalidSubchannel();
       let res = concludeWithSubchannels(ledgerChannel, invalidSubchannels);
       await truffleAssert.reverts(res);
     });
 
-    itWithRevert("conclude with wrong assets fails", async () => {
+    itWithBlockRevert("conclude with wrong assets fails", async () => {
       let subchannel = createChannel(newNonce(), "1", balance);
       let ledgerChannel = createParentChannel(
         newNonce(), "1", balance, [subchannel],
@@ -703,20 +711,20 @@ contract("Adjudicator", async (accounts) => {
       await registerWithAssertions(ledgerChannel);
       await registerWithAssertions(subchannel);
 
-      await advanceBlockTime(timeout + 10);
+      await advanceBlockTime(2 * timeout + 1);
 
       let res = concludeWithSubchannels(ledgerChannel, [subchannel]);
       await truffleAssert.reverts(res);
     });
 
     it("conclude ledger channel and subchannels", async () => {
-      await advanceBlockTime(timeout + 10);
+      await advanceBlockTime(2 * timeout + 1);
       let res = concludeWithSubchannels(ledgerChannel, subchannels);
       await assertConclude(res, ledgerChannel, subchannels);
     });
   });
 
-  describe("progress", async () => {
+  describeWithBlockRevert("progress", async () => {
     before(async () => {
       let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
       tx.state.version = "4";
@@ -732,7 +740,7 @@ contract("Adjudicator", async (accounts) => {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "progress with valid state before timeout fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -742,31 +750,31 @@ contract("Adjudicator", async (accounts) => {
         },
         desc: "advance past timeout; progress with invalid channelID fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign([accounts[8], accounts[8]]) },
         desc: "progress with invalid signature fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "progress with invalid actorIdx fails",
         actorIdx: 1,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "progress with invalid actor index fails",
         actorIdx: parts.length,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { tx.state.version = "6"; await tx.sign(parts) },
         desc: "progress with invalid version fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -775,7 +783,7 @@ contract("Adjudicator", async (accounts) => {
         },
         desc: "progress with wrong number of balances fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -784,7 +792,7 @@ contract("Adjudicator", async (accounts) => {
         },
         desc: "progress with wrong number of assets fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -794,7 +802,7 @@ contract("Adjudicator", async (accounts) => {
         },
         desc: "progress with mismatching balances fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -803,7 +811,7 @@ contract("Adjudicator", async (accounts) => {
         },
         desc: "progress with locked funds in new state fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -812,7 +820,7 @@ contract("Adjudicator", async (accounts) => {
         },
         desc: "progress with mismatching assets fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => {
@@ -821,19 +829,19 @@ contract("Adjudicator", async (accounts) => {
         },
         desc: "progress with wrong number of asset balances in new state fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "progress with valid state succeeds",
         actorIdx: 0,
-        revert: false,
+        shouldRevert: false,
       },
       {
         prepare: async (tx: Transaction) => { await tx.sign(parts) },
         desc: "progress with the same valid state twice fails",
         actorIdx: 0,
-        revert: true,
+        shouldRevert: true,
       },
     ]
 
@@ -845,7 +853,7 @@ contract("Adjudicator", async (accounts) => {
         tx.state.version = "5";
         await test.prepare(tx);
         let res = progress(tx, txOld.state.serialize(), test.actorIdx, tx.sigs[defaultActorIdx]);
-        if (test.revert) {
+        if (test.shouldRevert) {
           await truffleAssert.reverts(res);
         } else {
           await assertProgress(res, tx);
@@ -863,7 +871,18 @@ contract("Adjudicator", async (accounts) => {
       await assertProgress(res, tx);
     });
 
-    itWithRevert("progress in CONCLUDED fails", async () => {
+    itWithBlockRevert("progress after timeout fails", async () => {
+      await advanceBlockTime(timeout + 1);
+      let txOld = new Transaction(parts, balance, timeout, nonce, asset, app);
+      txOld.state.version = "6";
+      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
+      tx.state.version = "7";
+      await tx.sign(parts);
+      let res = progress(tx, txOld.state.serialize(), defaultActorIdx, tx.sigs[defaultActorIdx]);
+      await truffleAssert.reverts(res);
+    });
+
+    itWithBlockRevert("progress in CONCLUDED fails", async () => {
       await advanceBlockTime(timeout + 1);
 
       //conclude first
@@ -881,7 +900,7 @@ contract("Adjudicator", async (accounts) => {
     });
 
     function testWithModifiedOldState(description: string, prepare: any) {
-      itWithRevert(description, async () => {
+      itWithBlockRevert(description, async () => {
         // prepare state and register
         let nonce = "1";
         let tx1 = new Transaction(parts, balance, timeout, nonce, asset, app);
@@ -918,10 +937,29 @@ contract("Adjudicator", async (accounts) => {
     );
   });
 
-  snapshot("concludeFinal bypasses ongoing dispute", () => {
-    it("concludeFinal with ver 4", async () => {
+  describe("concludeFinal bypasses ongoing dispute", () => {
+    async function prepare() {
       let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
-      tx.state.version = "4";
+      tx.state.version = "2";
+      await tx.sign(parts);
+      let res = register(tx);
+      await assertRegister(res, tx);
+    }
+
+    itWithBlockRevert("concludeFinal with lesser version", async () => {
+      await prepare()
+      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
+      tx.state.version = "1";
+      tx.state.isFinal = true;
+      await tx.sign(parts);
+      let res = concludeFinal(tx);
+      await assertConcludeFinal(res, tx);
+    });
+
+    itWithBlockRevert("concludeFinal with greater version", async () => {
+      await prepare()
+      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
+      tx.state.version = "3";
       tx.state.isFinal = true;
       await tx.sign(parts);
       let res = concludeFinal(tx);
@@ -929,38 +967,81 @@ contract("Adjudicator", async (accounts) => {
     });
   });
 
-  // final conclude
-  describe("conclude", () => {
-    it("conclude from progressed challenge before timeout fails", async () => {
-      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
-      tx.state.version = "6";
-      await truffleAssert.reverts(conclude(tx));
+  describeWithBlockRevert("conclude", () => {
+    // *** conclude without refute and progress ***
+    //register
+    //conclude during dispute fails
+    //advance time
+    //conclude during forceexec fails
+    //advance time
+    //conclude succeeds
+
+    let nonceCounter = 0;
+
+    function prepareTransaction(): Transaction {
+      let nonce = (++nonceCounter).toString()
+      return new Transaction(parts, balance, timeout, nonce, asset, app)
+    }
+
+    let tx: Transaction
+    let txNoApp: Transaction
+
+    before(async () => {
+      // prepare
+      tx = prepareTransaction()
+      txNoApp = prepareTransaction()
+      txNoApp.params.app = zeroAddress
+      txNoApp.state.channelID = txNoApp.params.channelID()
+
+      // fund and register
+      async function fund(channel: Channel) {
+        return Promise.all(channel.params.participants.map((user: string, userIndex: number) => {
+          const amount = new BN(channel.state.outcome.balances[assetIndex][userIndex])
+          return depositWithAssertions(channel.state.channelID, user, amount)
+        }))
+      }
+      await fund(tx)
+      await fund(txNoApp)
+      await registerWithAssertions(tx)
+      await registerWithAssertions(txNoApp)
     });
 
-    it("conclude with invalid state fails", async () => {
-      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
-      tx.state.version = "7";
-      await truffleAssert.reverts(conclude(tx));
+    it("conclude during DISPUTE fails", async () => {
+      await truffleAssert.reverts(conclude(tx))
+      await truffleAssert.reverts(conclude(txNoApp))
     });
 
-    it("conclude with invalid params fails", async () => {
-      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
-      tx.state.version = "6";
-      tx.params.participants[1] = tx.params.participants[0];
-      await truffleAssert.reverts(conclude(tx));
+    it("conclude with app during FORCEEXEC fails", async () => {
+      await advanceBlockTime(timeout + 1)
+      await truffleAssert.reverts(conclude(tx))
     });
 
-    it("conclude from progressed challenge after timeout succeeds", async () => {
-      await advanceBlockTime(timeout + 10);
-      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
-      tx.state.version = "6";
+    it("conclude without app skips FORCEEXEC and succeeds", async () => {
+      let res = conclude(txNoApp);
+      await assertConclude(res, txNoApp, []);
+    });
+
+    itWithBlockRevert("conclude after FORCEEXEC with invalid params fails", async () => {
+      await advanceBlockTime(timeout + 1);
+      const txInvalidParams = prepareTransaction()
+      txInvalidParams.params.participants[1] = tx.params.participants[0]
+      await truffleAssert.reverts(conclude(txInvalidParams));
+    });
+
+    itWithBlockRevert("conclude after FORCEEXEC with invalid state fails", async () => {
+      await advanceBlockTime(timeout + 1);
+      const txProgressed = prepareTransaction();
+      txProgressed.state.incrementVersion();
+      await truffleAssert.reverts(conclude(txProgressed));
+    });
+
+    it("conclude after FORCEEXEC succeeds", async () => {
+      await advanceBlockTime(timeout + 1);
       let res = conclude(tx);
       await assertConclude(res, tx, []);
     });
 
     it("conclude twice fails", async () => {
-      let tx = new Transaction(parts, balance, timeout, nonce, asset, app);
-      tx.state.version = "6";
       await truffleAssert.reverts(conclude(tx));
     });
   })

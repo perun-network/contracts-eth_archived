@@ -33,8 +33,9 @@ export function fundingID(channelID: string, participant: string) {
       participant]));
 }
 
-export function snapshot(name: string, tests: any) {
-  describe("Snapshot: " + name, () => {
+// describe test suite followed by blockchain revert
+export function describeWithBlockRevert(name: string, tests: any) {
+  describe(name, () => {
     let snapshot_id: number;
 
     before("take snapshot before first test", async () => {
@@ -49,7 +50,8 @@ export function snapshot(name: string, tests: any) {
   });
 }
 
-export function itWithRevert(name: string, test: any) {
+// it test followed by blockchain revert
+export function itWithBlockRevert(name: string, test: any) {
   it(name, async () => {
     let snapshot_id = (await asyncWeb3Send('evm_snapshot', [])).result;
     await test();

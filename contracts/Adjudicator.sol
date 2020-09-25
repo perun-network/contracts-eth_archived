@@ -20,6 +20,7 @@ import "./App.sol";
 import "./AssetHolder.sol";
 import "./Sig.sol";
 import "../vendor/SafeMath.sol";
+import "../contracts/SafeMath64.sol";
 
 /**
  * @title The Perun Adjudicator
@@ -27,8 +28,8 @@ import "../vendor/SafeMath.sol";
  * @dev Adjudicator is the contract that decides on the current state of a statechannel.
  */
 contract Adjudicator {
-
     using SafeMath for uint256;
+    using SafeMath64 for uint64;
 
     /**
      * @dev Our state machine has three phases.
@@ -40,7 +41,9 @@ contract Adjudicator {
 
     struct Dispute {
         uint64 timeout;
+        uint64 challengeDuration;
         uint64 version;
+        bool hasApp;
         uint8 disputePhase;
         bytes32 stateHash;
     }
@@ -78,7 +81,7 @@ contract Adjudicator {
         require(state.channelID == channelID, "invalid channelID");
         require(disputes[channelID].stateHash == bytes32(0), "channel already registered");
         validateSignatures(params, state, sigs);
-        storeChallenge(params, state, DisputePhase.DISPUTE);
+        storeChallenge(params, state, DisputePhase.DISPUTE, true);
         emit Registered(channelID, state.version);
     }
 
@@ -102,11 +105,11 @@ contract Adjudicator {
         bytes32 channelID = calcChannelID(params);
         require(state.channelID == channelID, "invalid channelID");
         require(state.version > disputes[channelID].version, "can only refute with newer state");
+        require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "must be in DISPUTE phase");
         // solhint-disable-next-line not-rely-on-time
-        require(disputes[channelID].timeout > block.timestamp, "timeout passed");
-        require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "channel must be in DISPUTE phase");
+        require(block.timestamp < disputes[channelID].timeout, "timeout passed");
         validateSignatures(params, state, sigs);
-        storeChallenge(params, state, DisputePhase.DISPUTE);
+        storeChallenge(params, state, DisputePhase.DISPUTE, false);
         emit Refuted(channelID, state.version);
     }
 
@@ -136,15 +139,17 @@ contract Adjudicator {
         bytes32 channelID = calcChannelID(params);
         if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
             // solhint-disable-next-line not-rely-on-time
-            require(disputes[channelID].timeout <= block.timestamp, "timeout not passed yet");
+            require(block.timestamp >= disputes[channelID].timeout, "timeout not passed");
         } else {
-            require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC), "channel must be in FORCEEXEC");
+            require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC), "must be in FORCEEXEC phase");
+            // solhint-disable-next-line not-rely-on-time
+            require(block.timestamp < disputes[channelID].timeout, "timeout passed");
         }
         require(state.channelID == channelID, "invalid channelID");
         require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "wrong old state");
         require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]), "invalid signature");
         requireValidTransition(params, stateOld, state, actorIdx);
-        storeChallenge(params, state, DisputePhase.FORCEEXEC);
+        storeChallenge(params, state, DisputePhase.FORCEEXEC, true);
         emit Progressed(channelID, state.version);
     }
 
@@ -201,7 +206,7 @@ contract Adjudicator {
         require(state.channelID == calcChannelID(params), "invalid channelID");
         validateSignatures(params, state, sigs);
 
-        storeChallenge(params, state, DisputePhase.CONCLUDED);
+        storeChallenge(params, state, DisputePhase.CONCLUDED, false);
         emit Concluded(state.channelID, state.version);
         emit FinalConcluded(state.channelID);
 
@@ -227,23 +232,31 @@ contract Adjudicator {
     function storeChallenge(
         Channel.Params memory params,
         Channel.State memory state,
-        DisputePhase disputePhase)
+        DisputePhase disputePhase,
+        bool incrementTimeout)
     internal
     {
         uint256 timeout;
         if (state.isFinal) {
+            // final state should be immediately concludable
             // solhint-disable-next-line not-rely-on-time
             timeout = block.timestamp;
-        } else {
+        } else if (incrementTimeout) {
             // solhint-disable-next-line not-rely-on-time
             timeout = block.timestamp.add(params.challengeDuration);
+        } else {
+            timeout = disputes[state.channelID].timeout;
         }
+
         disputes[state.channelID] = Dispute({
-            stateHash: keccak256(abi.encode(state)),
             timeout: uint64(timeout),
+            challengeDuration: uint64(params.challengeDuration), // check whether params.challengeDuration does not exceed max(uint64)?
+            version: state.version,
+            hasApp: params.app != address(0),
             disputePhase: uint8(disputePhase),
-            version: state.version
+            stateHash: keccak256(abi.encode(state))
         });
+        
         emit Stored(state.channelID, state.version, uint64(timeout));
     }
 
@@ -368,12 +381,19 @@ contract Adjudicator {
         Channel.State memory state)
     internal
     {
-        require(disputes[state.channelID].stateHash == keccak256(abi.encode(state)), "invalid channel state");
-        if (disputes[state.channelID].disputePhase == uint8(DisputePhase.CONCLUDED)) { return; }
-
+        Dispute memory dispute = disputes[state.channelID];
+        require(dispute.stateHash == keccak256(Channel.encodeState(state)), "invalid channel state");
+        
+        if (dispute.disputePhase == uint8(DisputePhase.CONCLUDED)) { return; }
+        // if still in phase DISPUTE and the channel has an app, increase the
+        // timeout by one duration to account for phase FORCEEXEC
+        if (dispute.disputePhase == uint8(DisputePhase.DISPUTE) && dispute.hasApp) {
+            dispute.timeout = dispute.timeout.add(dispute.challengeDuration);
+        }
         // solhint-disable-next-line not-rely-on-time
-        require(disputes[state.channelID].timeout <= block.timestamp, "timeout not passed yet");
-        disputes[state.channelID].disputePhase = uint8(DisputePhase.CONCLUDED);
+        require(block.timestamp >= dispute.timeout, "timeout not passed yet");
+        dispute.disputePhase = uint8(DisputePhase.CONCLUDED);
+        disputes[state.channelID] = dispute;
         emit Concluded(state.channelID, state.version);
     }
 
