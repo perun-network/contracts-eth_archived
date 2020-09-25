@@ -14,9 +14,10 @@
 
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
+
+import "../vendor/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "./AssetHolder.sol";
 import "./Sig.sol";
-import "../vendor/SafeMath.sol";
 
 /**
  * @title The Perun AssetHolder
@@ -25,7 +26,6 @@ import "../vendor/SafeMath.sol";
  * the base currency.
  */
 contract AssetHolderETH is AssetHolder {
-
     using SafeMath for uint256;
 
     /**
@@ -52,7 +52,7 @@ contract AssetHolderETH is AssetHolder {
      * @notice Sends money from authorization.participant to authorization.receiver.
      * @param authorization WithdrawalAuth struct that is used to send money
      * from an ephemeral key to an on-chain key.
-     * @param signature Signature on the withdrawal authorization
+     * @param signature Signature on the withdrawal authorization.
      */
     function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external override {
         require(settled[authorization.channelID], "channel not settled");

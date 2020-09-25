@@ -18,7 +18,7 @@ declare const web3: Web3;
 import { hash, asyncWeb3Send } from "./web3";
 
 export function sleep(milliseconds: any) {
-   return new Promise(resolve => setTimeout(resolve, milliseconds));
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
 export async function advanceBlockTime(time: number): Promise<any> {
@@ -26,10 +26,10 @@ export async function advanceBlockTime(time: number): Promise<any> {
   return asyncWeb3Send('evm_mine', []);
 }
 
-export function fundingID(channelID: string, participant: string) {
+export function fundingID(channelID: string, participant: string): string {
   return hash(web3.eth.abi.encodeParameters(
-      ['bytes32','address'],
-      [web3.utils.rightPad(channelID, 64, "0"),
+    ['bytes32', 'address'],
+    [web3.utils.rightPad(channelID, 64, "0"),
       participant]));
 }
 

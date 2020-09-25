@@ -3,7 +3,7 @@ module.exports = {
 
     mocha: {
         reporter: 'eth-gas-reporter',
-        reporterOptions : {
+        reporterOptions: {
             // See https://www.npmjs.com/package/eth-gas-reporter
             // gasPrice: 300,
             onlyCalledMethods: false

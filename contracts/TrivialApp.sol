@@ -24,7 +24,7 @@ import "./App.sol";
  * @dev Just does nothing
  */
 contract TrivialApp is App {
-/**
+    /**
      * @notice ValidTransition checks if there was a valid transition between two states.
      * @param params The parameters of the channel.
      * @param from The current state.

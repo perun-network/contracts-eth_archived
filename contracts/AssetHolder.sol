@@ -14,7 +14,8 @@
 
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
-import "../vendor/SafeMath.sol";
+
+import "../vendor/openzeppelin-contracts/contracts/math/SafeMath.sol";
 
 /**
  * @title The Perun AssetHolder
@@ -22,7 +23,6 @@ import "../vendor/SafeMath.sol";
  * @dev AssetHolder is an abstract contract that holds the funds for a Perun state channel.
  */
 abstract contract AssetHolder {
-
     using SafeMath for uint256;
 
     /**

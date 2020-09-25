@@ -16,7 +16,6 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 library Channel {
-
     struct Params {
         uint256 challengeDuration;
         uint256 nonce;
