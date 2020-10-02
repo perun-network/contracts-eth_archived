@@ -17,13 +17,11 @@ pragma experimental ABIEncoderV2;
 
 import "../vendor/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "./AssetHolder.sol";
-import "./Sig.sol";
 
 /**
- * @title The Perun AssetHolder
- * @author The Perun Authors
- * @dev AssetHolderETH is a concrete implementation of AssetHolder that handles
- * the base currency.
+ * @title The Perun AssetHolderETH
+ * @notice AssetHolderETH is a concrete implementation of the abstract
+ * AssetHolder which holds ETH.
  */
 contract AssetHolderETH is AssetHolder {
     using SafeMath for uint256;
@@ -33,36 +31,25 @@ contract AssetHolderETH is AssetHolder {
      * base asset holder contract.
      * @param _adjudicator Address of the adjudicator contract.
      */
-    constructor(address _adjudicator) public AssetHolder(_adjudicator) {} // solhint-disable-line no-empty-blocks
+    constructor(address _adjudicator) public AssetHolder(_adjudicator) 
+    {} // solhint-disable-line no-empty-blocks
 
     /**
-     * @notice Used to deposit money into a channel.
-     * @dev Using the fundingID like this hides both the channelID as well as
-     * the participant address until a channel is settled.
-     * @param fundingID Unique identifier for a participant in a channel.
-     * @param amount Amount of money that should be deposited.
+     * @notice Should not be called directly but only by the parent AssetHolder.
+     * @dev Checks that `msg.value` is equal to `amount`.
      */
-    function deposit(bytes32 fundingID, uint256 amount) external payable override {
+    function depositCheck(bytes32, uint256 amount) internal override view {
         require(msg.value == amount, "wrong amount of ETH for deposit");
-        holdings[fundingID] = holdings[fundingID].add(amount);
-        emit Deposited(fundingID, amount);
     }
 
     /**
-     * @notice Sends money from authorization.participant to authorization.receiver.
-     * @param authorization WithdrawalAuth struct that is used to send money
-     * from an ephemeral key to an on-chain key.
-     * @param signature Signature on the withdrawal authorization.
+     * @notice Should not be called directly but only by the parent AssetHolder.
+     * @dev Withdraws ethereum for channel participant authorization.participant
+     * to authorization.receiver.
+     * @param authorization Withdrawal Authorization to authorize token transer
+     * from a channel participant to an on-chain receiver.
      */
-    function withdraw(WithdrawalAuth calldata authorization, bytes calldata signature) external override {
-        require(settled[authorization.channelID], "channel not settled");
-        require(Sig.verify(abi.encode(authorization), signature, authorization.participant),
-                "signature verification failed");
-        bytes32 id = calcFundingID(authorization.channelID, authorization.participant);
-        require(holdings[id] >= authorization.amount, "insufficient ETH for withdrawal");
-        // Decrease holdings, then transfer the money.
-        holdings[id] = holdings[id].sub(authorization.amount);
+    function withdrawEnact(WithdrawalAuth calldata authorization, bytes calldata) internal override {
         authorization.receiver.transfer(authorization.amount);
-        emit Withdrawn(id, authorization.amount, authorization.receiver);
     }
 }

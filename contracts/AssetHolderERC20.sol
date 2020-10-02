@@ -18,50 +18,48 @@ pragma experimental ABIEncoderV2;
 import "../vendor/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../vendor/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "./AssetHolder.sol";
-import "./Sig.sol";
 
+/**
+ * @title The Perun AssetHolderERC20
+ * @notice AssetHolderERC20 is a concrete implementation of the abstract
+ * AssetHolder which holds a specific ERC20 token.
+ * @dev Before calling `deposit`, the allowance for the AssetHolder must be set to
+ * at least the amount that should be deposited.
+ */
 contract AssetHolderERC20 is AssetHolder {
 	using SafeMath for uint256;
 
-	IERC20 token;
+	IERC20 public immutable token;
 
 	constructor(address _adjudicator, address _token) public AssetHolder(_adjudicator) {
 		token = IERC20(_token);
 	}
 
-	 /**
-     * @notice Used to deposit tokens into a channel.
-     * @dev The sender has to set the allowance for the assetHolder to
-	 * at least `amount`. The assetHolder will then use token.transferFrom
-	 * to deposit `amount` tokens from the sender into the channel
-	 * participant identified by `fundingID`.
-	 * Using the fundingID like this hides both the channelID as
-	 * well as the participant address until a channel is settled.
-     * @param fundingID Unique identifier for a participant in a channel.
-     * @param amount Amount of tokens that should be deposited.
-     */
-	function deposit(bytes32 fundingID, uint256 amount) external payable override {
-		require(msg.value == 0, "message value must be 0 for token deposit");
-		holdings[fundingID] = holdings[fundingID].add(amount);
-		require(token.transferFrom(msg.sender, address(this), amount), "transferFrom failed");
-		emit Deposited(fundingID, amount);
+	/**
+	 * @notice Used to check the validity of a deposit of tokens into a channel.
+	 * @dev The sender has to set the allowance for the assetHolder to
+	 * at least `amount`.
+	 */
+	function depositCheck(bytes32, uint256) internal view override {
+		require(msg.value == 0, "message value must be 0 for token deposit"); // solhint-disable-line reason-string
 	}
 
- 	/**
-     * @notice Withdraws tokens for channel participant authorization.participant
+	/**
+	 * @notice Should not be called directly but only by the parent AssetHolder.
+	 * @dev Transferes `amount` tokens from `msg.sender` to `fundingID`.	
+ 	 */
+	function depositEnact(bytes32, uint256 amount) internal override {
+		require(token.transferFrom(msg.sender, address(this), amount), "transferFrom failed");
+	}
+	
+	/**
+     * @notice Should not be called directly but only by the parent AssetHolder.
+     * @dev Withdraws tokens for channel participant authorization.participant
 	 * to authorization.receiver.
      * @param authorization Withdrawal Authorization to authorize token transer
      * from a channel participant to an on-chain receiver.
-     * @param signature Signature on the withdrawal authorization.
      */
-	function withdraw(WithdrawalAuth memory authorization, bytes memory signature) external override {
-		require(settled[authorization.channelID], "channel not settled");
-		require(Sig.verify(abi.encode(authorization), signature, authorization.participant), "signature verification failed");
-		bytes32 id = calcFundingID(authorization.channelID, authorization.participant);
-		require(holdings[id] >= authorization.amount, "insufficient ETH for withdrawal");
-		// Decrease holdings, then transfer the money.
-		holdings[id] = holdings[id].sub(authorization.amount);
+    function withdrawEnact(WithdrawalAuth calldata authorization, bytes calldata) internal override {
 		require(token.transfer(authorization.receiver, authorization.amount), "transfer failed");
-		emit Withdrawn(id, authorization.amount, authorization.receiver);
 	}
 }

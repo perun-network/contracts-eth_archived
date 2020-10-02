@@ -69,7 +69,7 @@ export function genericAssetHolderTest(setup: AssetHolderSetup) {
       await testDeposit(setup.B, ether(20), setup.channelID);
     });
 
-    it("Wrong msg.value", async () => {
+    it("wrong msg.value", async () => {
       let id = fundingID(setup.channelID, setup.parts[setup.A]);
       // AsserHolderETH   should revert for msg.value != amount and
       // AssetHolderToken should revert for msg.value != 0.
@@ -98,6 +98,20 @@ export function genericAssetHolderTest(setup: AssetHolderSetup) {
   })
 
   describe("Setting outcome", () => {
+    it("wrong parts length", async () => {
+      const wrongParts = [setup.parts[setup.A]]
+      await truffleAssert.reverts(
+        setup.ah.setOutcome(setup.channelID, wrongParts, finalBalance, { from: setup.adj }),
+      );
+    });
+
+    it("wrong balances length", async () => {
+      const wrongBals = [ether(1)]
+      await truffleAssert.reverts(
+        setup.ah.setOutcome(setup.channelID, setup.parts, wrongBals, { from: setup.adj }),
+      );
+    });
+    
     it("wrong sender", async () => {
       await truffleAssert.reverts(
         setup.ah.setOutcome(setup.channelID, setup.parts, finalBalance, { from: setup.txSender }),
