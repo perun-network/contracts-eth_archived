@@ -33,22 +33,23 @@ solhint:
     - npm install -g solhint
     - solhint "contracts/**/*.sol"
 
+.build: &build |
+  npm -g install truffle@5.1.46 typescript
+  yarn install --pure-lockfile
+  yarn build
+
 test:
   image: node:12
   stage: test
   script:
-    - npm -g install truffle typescript
-    - yarn install --pure-lockfile
-    - yarn build
+    - *build
     - yarn test
 
 coverage:
   image: node:12
   stage: security
   script:
-    - npm -g install truffle typescript
-    - yarn install --pure-lockfile
-    - yarn build
+    - *build
     - truffle run coverage
 
 mythril:
