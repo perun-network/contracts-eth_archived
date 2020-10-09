@@ -19,8 +19,7 @@ import "../vendor/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "./Channel.sol";
 import "./App.sol";
 import "./AssetHolder.sol";
-import "./Sig.sol";
-import "../contracts/SafeMath64.sol";
+import "./SafeMath64.sol";
 
 /**
  * @title The Perun Adjudicator
@@ -77,10 +76,10 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
-        bytes32 channelID = calcChannelID(params);
+        bytes32 channelID = Channel.ID(params);
         require(state.channelID == channelID, "invalid channelID");
         require(disputes[channelID].stateHash == bytes32(0), "channel already registered");
-        validateSignatures(params, state, sigs);
+        Channel.validateSignatures(params, state, sigs);
         storeChallenge(params, state, DisputePhase.DISPUTE, true);
         emit Registered(channelID, state.version);
     }
@@ -102,13 +101,13 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
-        bytes32 channelID = calcChannelID(params);
+        bytes32 channelID = Channel.ID(params);
         require(state.channelID == channelID, "invalid channelID");
         require(state.version > disputes[channelID].version, "can only refute with newer state");
         require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "must be in DISPUTE phase");
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp < disputes[channelID].timeout, "timeout passed");
-        validateSignatures(params, state, sigs);
+        Channel.validateSignatures(params, state, sigs);
         storeChallenge(params, state, DisputePhase.DISPUTE, false);
         emit Refuted(channelID, state.version);
     }
@@ -136,7 +135,7 @@ contract Adjudicator {
     public
     {
         require(actorIdx < params.participants.length, "actorIdx out of range");
-        bytes32 channelID = calcChannelID(params);
+        bytes32 channelID = Channel.ID(params);
         if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
             // solhint-disable-next-line not-rely-on-time
             require(block.timestamp >= disputes[channelID].timeout, "timeout not passed");
@@ -146,7 +145,7 @@ contract Adjudicator {
             require(block.timestamp < disputes[channelID].timeout, "timeout passed");
         }
         require(state.channelID == channelID, "invalid channelID");
-        require(disputes[channelID].stateHash == keccak256(abi.encode(stateOld)), "wrong old state");
+        require(disputes[channelID].stateHash == Channel.hashState(stateOld), "wrong old state");
         require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]), "invalid signature");
         requireValidTransition(params, stateOld, state, actorIdx);
         storeChallenge(params, state, DisputePhase.FORCEEXEC, true);
@@ -176,7 +175,7 @@ contract Adjudicator {
     public
     {
         require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
-        require(state.channelID == calcChannelID(params), "state and params mismatch");
+        require(state.channelID == Channel.ID(params), "state and params mismatch");
 
         ensureTreeConcluded(state, subStates);
         pushOutcome(state, subStates, params.participants);
@@ -203,8 +202,8 @@ contract Adjudicator {
         require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
         require(state.isFinal == true, "state not final");
         require(state.outcome.locked.length == 0, "cannot have sub-channels");
-        require(state.channelID == calcChannelID(params), "invalid channelID");
-        validateSignatures(params, state, sigs);
+        require(state.channelID == Channel.ID(params), "invalid channelID");
+        Channel.validateSignatures(params, state, sigs);
 
         storeChallenge(params, state, DisputePhase.CONCLUDED, false);
         emit Concluded(state.channelID, state.version);
@@ -212,15 +211,6 @@ contract Adjudicator {
 
         Channel.State[] memory subStates = new Channel.State[](0);
         pushOutcome(state, subStates, params.participants);
-    }
-
-    /**
-     * @notice Calculates the channelID of the state channel.
-     * @param params The parameter of the channel.
-     * @return The channelID
-     */
-    function calcChannelID(Channel.Params memory params) internal pure returns (bytes32) {
-        return keccak256(abi.encode(params));
     }
 
     /**
@@ -254,7 +244,7 @@ contract Adjudicator {
             version: state.version,
             hasApp: params.app != address(0),
             disputePhase: uint8(disputePhase),
-            stateHash: keccak256(abi.encode(state))
+            stateHash: Channel.hashState(state)
         });
         
         emit Stored(state.channelID, state.version, uint64(timeout));
@@ -382,7 +372,7 @@ contract Adjudicator {
     internal
     {
         Dispute memory dispute = disputes[state.channelID];
-        require(dispute.stateHash == keccak256(Channel.encodeState(state)), "invalid channel state");
+        require(dispute.stateHash == Channel.hashState(state), "invalid channel state");
         
         if (dispute.disputePhase == uint8(DisputePhase.CONCLUDED)) { return; }
         // if still in phase DISPUTE and the channel has an app, increase the
@@ -435,25 +425,6 @@ contract Adjudicator {
 
             // push accumulated outcome
             AssetHolder(assets[a]).setOutcome(state.channelID, participants, outcome);
-        }
-    }
-
-    /**
-     * @dev checks that we have n valid signatures on a state.
-     * @param params The parameters corresponding to the state.
-     * @param state The state of the state channel.
-     * @param sigs An array of n signatures corresponding to the n participants of the channel.
-     */
-    function validateSignatures(
-        Channel.Params memory params,
-        Channel.State memory state,
-        bytes[] memory sigs)
-    internal pure
-    {
-        bytes memory encodedState = Channel.encodeState(state);
-        require(params.participants.length == sigs.length, "signatures length mismatch");
-        for (uint256 i = 0; i < sigs.length; i++) {
-            require(Sig.verify(encodedState, sigs[i], params.participants[i]), "invalid signature");
         }
     }
 }

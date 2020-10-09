@@ -49,6 +49,7 @@ $ yarn
 $ yarn build
 $ yarn test
 ```
+This has been tested with Truffle version `5.1.46`.
 
 ## Copyright
 Copyright 2020 - See [NOTICE](NOTICE) file for copyright holders.
