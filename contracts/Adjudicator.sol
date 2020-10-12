@@ -76,7 +76,7 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
-        bytes32 channelID = Channel.ID(params);
+        bytes32 channelID = channelID(params);
         require(state.channelID == channelID, "invalid channelID");
         require(disputes[channelID].stateHash == bytes32(0), "channel already registered");
         Channel.validateSignatures(params, state, sigs);
@@ -101,7 +101,7 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
-        bytes32 channelID = Channel.ID(params);
+        bytes32 channelID = channelID(params);
         require(state.channelID == channelID, "invalid channelID");
         require(state.version > disputes[channelID].version, "can only refute with newer state");
         require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "must be in DISPUTE phase");
@@ -135,7 +135,7 @@ contract Adjudicator {
     public
     {
         require(actorIdx < params.participants.length, "actorIdx out of range");
-        bytes32 channelID = Channel.ID(params);
+        bytes32 channelID = channelID(params);
         if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
             // solhint-disable-next-line not-rely-on-time
             require(block.timestamp >= disputes[channelID].timeout, "timeout not passed");
@@ -145,7 +145,7 @@ contract Adjudicator {
             require(block.timestamp < disputes[channelID].timeout, "timeout passed");
         }
         require(state.channelID == channelID, "invalid channelID");
-        require(disputes[channelID].stateHash == Channel.hashState(stateOld), "wrong old state");
+        require(disputes[channelID].stateHash == hashState(stateOld), "wrong old state");
         require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]), "invalid signature");
         requireValidTransition(params, stateOld, state, actorIdx);
         storeChallenge(params, state, DisputePhase.FORCEEXEC, true);
@@ -175,7 +175,7 @@ contract Adjudicator {
     public
     {
         require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
-        require(state.channelID == Channel.ID(params), "state and params mismatch");
+        require(state.channelID == channelID(params), "state and params mismatch");
 
         ensureTreeConcluded(state, subStates);
         pushOutcome(state, subStates, params.participants);
@@ -202,7 +202,7 @@ contract Adjudicator {
         require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
         require(state.isFinal == true, "state not final");
         require(state.outcome.locked.length == 0, "cannot have sub-channels");
-        require(state.channelID == Channel.ID(params), "invalid channelID");
+        require(state.channelID == channelID(params), "invalid channelID");
         Channel.validateSignatures(params, state, sigs);
 
         storeChallenge(params, state, DisputePhase.CONCLUDED, false);
@@ -211,6 +211,24 @@ contract Adjudicator {
 
         Channel.State[] memory subStates = new Channel.State[](0);
         pushOutcome(state, subStates, params.participants);
+    }
+
+    /**
+     * @notice Calculates the channel's ID from the given parameters.
+     * @param params The parameters of the channel.
+     * @return The ID of the channel.
+     */
+    function channelID(Channel.Params memory params) public pure returns (bytes32) {
+        return keccak256(Channel.encodeParams(params));
+    }
+
+    /**
+     * @notice Calculates the hash of a state.
+     * @param state The state to hash.
+     * @return The hash of the state.
+     */
+    function hashState(Channel.State memory state) public pure returns (bytes32) {
+        return keccak256(Channel.encodeState(state));
     }
 
     /**
@@ -244,7 +262,7 @@ contract Adjudicator {
             version: state.version,
             hasApp: params.app != address(0),
             disputePhase: uint8(disputePhase),
-            stateHash: Channel.hashState(state)
+            stateHash: hashState(state)
         });
         
         emit Stored(state.channelID, state.version, uint64(timeout));
@@ -372,7 +390,7 @@ contract Adjudicator {
     internal
     {
         Dispute memory dispute = disputes[state.channelID];
-        require(dispute.stateHash == Channel.hashState(state), "invalid channel state");
+        require(dispute.stateHash == hashState(state), "invalid channel state");
         
         if (dispute.disputePhase == uint8(DisputePhase.CONCLUDED)) { return; }
         // if still in phase DISPUTE and the channel has an app, increase the
