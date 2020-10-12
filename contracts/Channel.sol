@@ -48,24 +48,6 @@ library Channel {
     }
 
     /**
-     * @notice Calculates the channel's ID from the given parameters.
-     * @param params The parameters of the channel.
-     * @return The ID of the channel.
-     */
-    function ID(Params memory params) public pure returns (bytes32) { // solhint-disable func-name-mixedcase
-        return keccak256(encodeParams(params));
-    }
-
-    /**
-     * @notice Calculates the hash of a state.
-     * @param state The state to hash.
-     * @return The hash of the state.
-     */
-    function hashState(State memory state) public pure returns (bytes32) {
-        return keccak256(encodeState(state));
-    }
-
-    /**
      * @notice Checks that `sigs` contains all signatures on the state
      * from the channel participants. Reverts otherwise.
      * @param params The parameters corresponding to the state.
