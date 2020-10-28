@@ -18,14 +18,6 @@ copyright:
     - .scripts/check-notice-authors.sh $(git log --pretty=format:"%H" --merges -n 1)
     - .scripts/check-copyright-notice.sh
 
-solium:
-  image: node:12
-  stage: lint
-  script:
-    - npm install -g ethlint
-    - solium -d contracts/
-  allow_failure: true
-
 solhint:
   image: node:12
   stage: lint
