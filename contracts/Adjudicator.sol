@@ -234,10 +234,13 @@ contract Adjudicator {
     }
 
     /**
-     * @dev Stores the provided challenge in the dipute registry
+     * @dev Stores the provided challenge in the dispute registry, applying
+     * timeout logic first.
      * @param params The parameters of the state channel.
      * @param state The current state of the state channel.
      * @param disputePhase The phase in which the state channel is currently.
+     * @param incrementTimeout Indicates whether the current phase timeout
+     * should be incremented.
      */
     function storeChallenge(
         Channel.Params memory params,
