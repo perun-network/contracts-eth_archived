@@ -33,7 +33,7 @@ contract AssetHolderETH is AssetHolder {
      * base asset holder contract.
      * @param _adjudicator Address of the adjudicator contract.
      */
-    constructor(address _adjudicator) public AssetHolder(_adjudicator) 
+    constructor(address _adjudicator) AssetHolder(_adjudicator) 
     {} // solhint-disable-line no-empty-blocks
 
     /**

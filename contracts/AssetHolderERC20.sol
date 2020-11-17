@@ -33,7 +33,7 @@ contract AssetHolderERC20 is AssetHolder {
 
 	IERC20 public immutable token;
 
-	constructor(address _adjudicator, address _token) public AssetHolder(_adjudicator) {
+	constructor(address _adjudicator, address _token) AssetHolder(_adjudicator) {
 		token = IERC20(_token);
 	}
 

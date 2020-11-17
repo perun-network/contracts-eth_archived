@@ -72,7 +72,7 @@ abstract contract AssetHolder {
      * @notice Sets the adjudicator contract that is able to call setOutcome on this contract.
      * @param _adjudicator Address of the adjudicator contract.
      */
-    constructor(address _adjudicator) internal {
+    constructor(address _adjudicator) {
         adjudicator = _adjudicator;
     }
 
