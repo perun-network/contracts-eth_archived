@@ -136,6 +136,7 @@ contract Adjudicator {
         bytes memory sig)
     public
     {
+        require(params.app != address(0), "must have app");
         require(actorIdx < params.participants.length, "actorIdx out of range");
         bytes32 channelID = channelID(params);
         if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
