@@ -22,7 +22,7 @@
     "test": "truffle test"
   },
   "dependencies": {
-    "eth-gas-reporter": "^0.2.12",
+    "eth-gas-reporter": "^0.2.19",
     "solidity-coverage": "^0.7.0",
     "truffle-error": "^0.0.5",
     "truffle-security": "^1.5.5",
