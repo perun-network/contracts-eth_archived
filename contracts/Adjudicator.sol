@@ -54,9 +54,14 @@ contract Adjudicator {
      */
     mapping(bytes32 => Dispute) public disputes;
 
-    event Registered(bytes32 indexed channelID, uint64 version, uint64 timeout);
-    event Progressed(bytes32 indexed channelID, uint64 version, uint64 timeout);
-    event Concluded(bytes32 indexed channelID, uint64 version);
+    /**
+     * @notice Indicates that a channel has been updated.
+     * @param channelID The identifier of the channel.
+     * @param version The version of the channel state.
+     * @param version The dispute phase of the channel.
+     * @param timeout The dispute phase timeout.
+     */
+    event ChannelUpdate(bytes32 indexed channelID, uint64 version, uint8 phase, uint64 timeout);
 
     /**
      * @notice Register registers a non-final state of a channel.
@@ -88,8 +93,7 @@ contract Adjudicator {
             require(block.timestamp < dispute.timeout, "refutation timeout passed");
         }
 
-        uint64 timeout = storeChallenge(params, state, DisputePhase.DISPUTE);
-        emit Registered(state.channelID, state.version, timeout);
+        storeChallenge(params, state, DisputePhase.DISPUTE);
     }
 
     /**
@@ -132,8 +136,7 @@ contract Adjudicator {
         require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]), "invalid signature");
         requireValidTransition(params, stateOld, state, actorIdx);
 
-        uint64 timeout = storeChallenge(params, state, DisputePhase.FORCEEXEC);
-        emit Progressed(state.channelID, state.version, timeout);
+        storeChallenge(params, state, DisputePhase.FORCEEXEC);
     }
 
     /**
@@ -196,7 +199,6 @@ contract Adjudicator {
         }
 
         storeChallenge(params, state, DisputePhase.CONCLUDED);
-        emit Concluded(state.channelID, state.version);
 
         Channel.State[] memory subStates = new Channel.State[](0);
         pushOutcome(state, subStates, params.participants);
@@ -238,13 +240,12 @@ contract Adjudicator {
      * @param params The parameters of the state channel.
      * @param state The current state of the state channel.
      * @param disputePhase The channel phase.
-     * @return The updated phase timeout.
      */
     function storeChallenge(
         Channel.Params memory params,
         Channel.State memory state,
         DisputePhase disputePhase)
-    internal returns (uint64)
+    internal
     {
         (Dispute memory dispute, bool registered) = getDispute(state.channelID);
         
@@ -266,7 +267,6 @@ contract Adjudicator {
         }
 
         setDispute(state.channelID, dispute);
-        return dispute.timeout;
     }
 
     /**
@@ -406,8 +406,6 @@ contract Adjudicator {
         dispute.phase = uint8(DisputePhase.CONCLUDED);
 
         setDispute(state.channelID, dispute);
-
-        emit Concluded(state.channelID, state.version);
     }
 
     /**
@@ -471,9 +469,11 @@ contract Adjudicator {
     }
 
     /**
-     * @dev Sets the dispute state for the given channelID.
+     * @dev Sets the dispute state for the given channelID. Emits event
+     * ChannelUpdate.
      */
     function setDispute(bytes32 _channelID, Dispute memory dispute) internal {
         disputes[_channelID] = dispute;
+        emit ChannelUpdate(_channelID, dispute.version, dispute.phase, dispute.timeout);
     }
 }

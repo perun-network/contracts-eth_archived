@@ -109,11 +109,12 @@ contract("Adjudicator", async (accounts) => {
   }
 
   function assertEventEmitted(
-    name: string, res: Truffle.TransactionResponse, channel: Channel) {
+    name: string, res: Truffle.TransactionResponse, channel: Channel, phase: DisputePhase) {
     truffleAssert.eventEmitted(res, name,
       (ev: any) => {
         return ev.channelID == channel.params.channelID()
-          && (!ev.version || (ev.version == channel.state.version));
+          && ev.version == channel.state.version
+          && ev.phase == phase;
       }
     );
   }
@@ -125,35 +126,36 @@ contract("Adjudicator", async (accounts) => {
   }
 
   async function assertRegister(res: Promise<Truffle.TransactionResponse>, channel: Channel) {
-    assertEventEmitted('Registered', await res, channel);
+    assertEventEmitted('ChannelUpdate', await res, channel, DisputePhase.DISPUTE);
     await assertDisputePhase(channel.state.channelID, DisputePhase.DISPUTE);
   }
 
   async function assertProgress(res: Promise<Truffle.TransactionResponse>, channel: Channel) {
-    assertEventEmitted('Progressed', await res, channel);
+    assertEventEmitted('ChannelUpdate', await res, channel, DisputePhase.FORCEEXEC);
     await assertDisputePhase(channel.state.channelID, DisputePhase.FORCEEXEC);
   }
 
-  async function assertConclude(res: Promise<Truffle.TransactionResponse>, channel: Channel, subchannels: Channel[]) {
+  async function assertConclude(res: Promise<Truffle.TransactionResponse>, channel: Channel, subchannels: Channel[], checkOutcome: boolean = true) {
     /* this method currently only checks for the concluded and stored event of
     the ledger channel as it is not generally known which subchannels are not
     yet concluded. thus it is unclear for which subset of `subchannels` the
     events should be emitted. */
-    assertEventEmitted('Concluded', await res, channel);
+    assertEventEmitted('ChannelUpdate', await res, channel, DisputePhase.CONCLUDED);
 
     await assertDisputePhase(channel.state.channelID, DisputePhase.CONCLUDED);
     await Promise.all(subchannels.map(async channel => assertDisputePhase(channel.state.channelID, DisputePhase.CONCLUDED)));
 
-    const expectedOutcome = accumulatedOutcome(channel, subchannels);
-    await Promise.all(channel.params.participants.map(async (user, userIndex) => {
-      let outcome = await ah.holdings.call(fundingID(channel.state.channelID, user));
-      assert(outcome.eq(expectedOutcome[userIndex]), "outcome not equal");
-    }))
+    if (checkOutcome) {
+      const expectedOutcome = accumulatedOutcome(channel, subchannels);
+      await Promise.all(channel.params.participants.map(async (user, userIndex) => {
+        let outcome = await ah.holdings.call(fundingID(channel.state.channelID, user));
+        assert(outcome.eq(expectedOutcome[userIndex]), `outcome for user ${userIndex} not equal: got ${expectedOutcome[userIndex]}, expected ${outcome}`);
+      }))
+    }
   }
 
-  async function assertConcludeFinal(res: Promise<Truffle.TransactionResponse>, channel: Channel) {
-    assertEventEmitted('Concluded', await res, channel);
-    await assertDisputePhase(channel.state.channelID, DisputePhase.CONCLUDED);
+  async function assertConcludeFinal(res: Promise<Truffle.TransactionResponse>, channel: Channel, checkOutcome: boolean = true) {
+    await assertConclude(res, channel, [], checkOutcome);
   }
 
   async function depositWithAssertions(channelID: string, user: string, amount: BN) {    
@@ -448,7 +450,7 @@ contract("Adjudicator", async (accounts) => {
         await subchannel.state.sign(subchannel.params.participants),
         {from: accounts[0]}
       );
-      await assertConcludeFinal(res, subchannel);
+      await assertConcludeFinal(res, subchannel, false);
     });
 
     itWithBlockRevert("conclude with wrong number of subchannels fails", async () => {
