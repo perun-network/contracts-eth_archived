@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// SPDX-License-Identifier: Apache-2.0
+
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
@@ -25,7 +27,7 @@ contract PerunToken is ERC20 {
      * @dev Creates a new PerunToken contract instance with `accounts` being
      * funded with `initBalance` tokens.
      */
-    constructor (address[] memory accounts, uint256 initBalance) public ERC20("PerunToken", "PRN") {
+    constructor (address[] memory accounts, uint256 initBalance) ERC20("PerunToken", "PRN") {
         for (uint256 i = 0; i < accounts.length; i++) {
             _mint(accounts[i], initBalance);
         }

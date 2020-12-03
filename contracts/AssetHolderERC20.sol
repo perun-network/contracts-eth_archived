@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// SPDX-License-Identifier: Apache-2.0
+
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
@@ -31,7 +33,7 @@ contract AssetHolderERC20 is AssetHolder {
 
 	IERC20 public immutable token;
 
-	constructor(address _adjudicator, address _token) public AssetHolder(_adjudicator) {
+	constructor(address _adjudicator, address _token) AssetHolder(_adjudicator) {
 		token = IERC20(_token);
 	}
 

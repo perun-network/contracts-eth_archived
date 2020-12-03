@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// SPDX-License-Identifier: Apache-2.0
+
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
@@ -70,7 +72,7 @@ abstract contract AssetHolder {
      * @notice Sets the adjudicator contract that is able to call setOutcome on this contract.
      * @param _adjudicator Address of the adjudicator contract.
      */
-    constructor(address _adjudicator) internal {
+    constructor(address _adjudicator) {
         adjudicator = _adjudicator;
     }
 

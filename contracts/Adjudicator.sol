@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// SPDX-License-Identifier: Apache-2.0
+
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
@@ -43,7 +45,7 @@ contract Adjudicator {
         uint64 challengeDuration;
         uint64 version;
         bool hasApp;
-        uint8 disputePhase;
+        uint8 phase;
         bytes32 stateHash;
     }
 
@@ -52,18 +54,21 @@ contract Adjudicator {
      */
     mapping(bytes32 => Dispute) public disputes;
 
-    event Registered(bytes32 indexed channelID, uint64 version);
-    event Refuted(bytes32 indexed channelID, uint64 version);
-    event Progressed(bytes32 indexed channelID, uint64 version);
-    event Stored(bytes32 indexed channelID, uint64 version, uint64 timeout);
-    event FinalConcluded(bytes32 indexed channelID);
-    event Concluded(bytes32 indexed channelID, uint64 version);
+    /**
+     * @notice Indicates that a channel has been updated.
+     * @param channelID The identifier of the channel.
+     * @param version The version of the channel state.
+     * @param version The dispute phase of the channel.
+     * @param timeout The dispute phase timeout.
+     */
+    event ChannelUpdate(bytes32 indexed channelID, uint64 version, uint8 phase, uint64 timeout);
 
     /**
      * @notice Register registers a non-final state of a channel.
      * If the call was successful a Registered event is emitted.
      *
-     * @dev It can only be called if no other dispute is currently in progress.
+     * @dev It can only be called if the channel has not been registered yet, or
+     * the refutation timeout has not passed.
      * The caller has to provide n signatures on the state.
      *
      * @param params The parameters of the state channel.
@@ -76,40 +81,19 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
-        bytes32 channelID = channelID(params);
-        require(state.channelID == channelID, "invalid channelID");
-        require(disputes[channelID].stateHash == bytes32(0), "channel already registered");
+        requireValidParams(params, state);
         Channel.validateSignatures(params, state, sigs);
-        storeChallenge(params, state, DisputePhase.DISPUTE, true);
-        emit Registered(channelID, state.version);
-    }
 
-    /**
-     * @notice Refute is called to refute a dispute.
-     * If the call was successful a Refuted event is emitted.
-     *
-     * @dev Refute can only be called with a higher version state.
-     * The caller has to provide n signatures on the new state.
-     *
-     * @param params The parameters of the state channel.
-     * @param state The current state of the state channel.
-     * @param sigs Array of n signatures on the current state.
-     */
-    function refute(
-        Channel.Params memory params,
-        Channel.State memory state,
-        bytes[] memory sigs)
-    public
-    {
-        bytes32 channelID = channelID(params);
-        require(state.channelID == channelID, "invalid channelID");
-        require(state.version > disputes[channelID].version, "can only refute with newer state");
-        require(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE), "must be in DISPUTE phase");
-        // solhint-disable-next-line not-rely-on-time
-        require(block.timestamp < disputes[channelID].timeout, "timeout passed");
-        Channel.validateSignatures(params, state, sigs);
-        storeChallenge(params, state, DisputePhase.DISPUTE, false);
-        emit Refuted(channelID, state.version);
+        // If registered, require newer version and refutation timeout not passed.
+        (Dispute memory dispute, bool registered) = getDispute(state.channelID);
+        if (registered) {
+            require(dispute.version < state.version, "invalid version");
+            require(dispute.phase == uint8(DisputePhase.DISPUTE), "incorrect phase");
+            // solhint-disable-next-line not-rely-on-time
+            require(block.timestamp < dispute.timeout, "refutation timeout passed");
+        }
+
+        storeChallenge(params, state, DisputePhase.DISPUTE);
     }
 
     /**
@@ -134,22 +118,25 @@ contract Adjudicator {
         bytes memory sig)
     public
     {
-        require(actorIdx < params.participants.length, "actorIdx out of range");
-        bytes32 channelID = channelID(params);
-        if(disputes[channelID].disputePhase == uint8(DisputePhase.DISPUTE)) {
+        Dispute memory dispute = requireGetDispute(state.channelID);
+        if(dispute.phase == uint8(DisputePhase.DISPUTE)) {
             // solhint-disable-next-line not-rely-on-time
-            require(block.timestamp >= disputes[channelID].timeout, "timeout not passed");
+            require(block.timestamp >= dispute.timeout, "timeout not passed");
+        } else if (dispute.phase == uint8(DisputePhase.FORCEEXEC)) {
+            // solhint-disable-next-line not-rely-on-time
+            require(block.timestamp < dispute.timeout, "timeout passed");
         } else {
-            require(disputes[channelID].disputePhase == uint8(DisputePhase.FORCEEXEC), "must be in FORCEEXEC phase");
-            // solhint-disable-next-line not-rely-on-time
-            require(block.timestamp < disputes[channelID].timeout, "timeout passed");
+            revert("invalid phase");
         }
-        require(state.channelID == channelID, "invalid channelID");
-        require(disputes[channelID].stateHash == hashState(stateOld), "wrong old state");
+
+        require(params.app != address(0), "must have app");
+        require(actorIdx < params.participants.length, "actorIdx out of range");
+        requireValidParams(params, state);
+        require(dispute.stateHash == hashState(stateOld), "wrong old state");
         require(Sig.verify(Channel.encodeState(state), sig, params.participants[actorIdx]), "invalid signature");
         requireValidTransition(params, stateOld, state, actorIdx);
-        storeChallenge(params, state, DisputePhase.FORCEEXEC, true);
-        emit Progressed(channelID, state.version);
+
+        storeChallenge(params, state, DisputePhase.FORCEEXEC);
     }
 
     /**
@@ -174,8 +161,9 @@ contract Adjudicator {
         Channel.State[] memory subStates)
     public
     {
-        require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
-        require(state.channelID == channelID(params), "state and params mismatch");
+        Dispute memory dispute = requireGetDispute(state.channelID);
+        require(dispute.phase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
+        requireValidParams(params, state);
 
         ensureTreeConcluded(state, subStates);
         pushOutcome(state, subStates, params.participants);
@@ -199,15 +187,18 @@ contract Adjudicator {
         bytes[] memory sigs)
     public
     {
-        require(disputes[state.channelID].disputePhase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
         require(state.isFinal == true, "state not final");
         require(state.outcome.locked.length == 0, "cannot have sub-channels");
-        require(state.channelID == channelID(params), "invalid channelID");
+        requireValidParams(params, state);
         Channel.validateSignatures(params, state, sigs);
 
-        storeChallenge(params, state, DisputePhase.CONCLUDED, false);
-        emit Concluded(state.channelID, state.version);
-        emit FinalConcluded(state.channelID);
+        // If registered, require not concluded.
+        (Dispute memory dispute, bool registered) = getDispute(state.channelID);
+        if (registered) {
+            require(dispute.phase != uint8(DisputePhase.CONCLUDED), "channel already concluded");
+        }
+
+        storeChallenge(params, state, DisputePhase.CONCLUDED);
 
         Channel.State[] memory subStates = new Channel.State[](0);
         pushOutcome(state, subStates, params.participants);
@@ -232,40 +223,50 @@ contract Adjudicator {
     }
 
     /**
-     * @dev Stores the provided challenge in the dipute registry
+     * @notice Asserts that the given parameters are valid for the given state
+     * by computing the channelID from the parameters and comparing it to the
+     * channelID stored in state.
+     */
+    function requireValidParams(
+        Channel.Params memory params,
+        Channel.State memory state)
+    internal pure {
+        require(state.channelID == channelID(params), "invalid params");
+    }
+
+    /**
+     * @dev Updates the dispute state according to the given parameters, state,
+     * and phase, and determines the corresponding phase timeout.
      * @param params The parameters of the state channel.
      * @param state The current state of the state channel.
-     * @param disputePhase The phase in which the state channel is currently.
+     * @param disputePhase The channel phase.
      */
     function storeChallenge(
         Channel.Params memory params,
         Channel.State memory state,
-        DisputePhase disputePhase,
-        bool incrementTimeout)
+        DisputePhase disputePhase)
     internal
     {
-        uint256 timeout;
+        (Dispute memory dispute, bool registered) = getDispute(state.channelID);
+        
+        dispute.challengeDuration = uint64(params.challengeDuration);
+        dispute.version = state.version;
+        dispute.hasApp = params.app != address(0);
+        dispute.phase = uint8(disputePhase);
+        dispute.stateHash = hashState(state);
+
+        // Compute timeout.
         if (state.isFinal) {
-            // final state should be immediately concludable
+            // Make channel concludable if state is final.
             // solhint-disable-next-line not-rely-on-time
-            timeout = block.timestamp;
-        } else if (incrementTimeout) {
+            dispute.timeout = uint64(block.timestamp);
+        } else if (!registered || dispute.phase == uint8(DisputePhase.FORCEEXEC)) {
+            // Increment timeout if channel is not registered or in phase FORCEEXEC.
             // solhint-disable-next-line not-rely-on-time
-            timeout = block.timestamp.add(params.challengeDuration);
-        } else {
-            timeout = disputes[state.channelID].timeout;
+            dispute.timeout = uint64(block.timestamp).add(dispute.challengeDuration);
         }
 
-        disputes[state.channelID] = Dispute({
-            timeout: uint64(timeout),
-            challengeDuration: uint64(params.challengeDuration), // check whether params.challengeDuration does not exceed max(uint64)?
-            version: state.version,
-            hasApp: params.app != address(0),
-            disputePhase: uint8(disputePhase),
-            stateHash: hashState(state)
-        });
-        
-        emit Stored(state.channelID, state.version, uint64(timeout));
+        setDispute(state.channelID, dispute);
     }
 
     /**
@@ -389,20 +390,22 @@ contract Adjudicator {
         Channel.State memory state)
     internal
     {
-        Dispute memory dispute = disputes[state.channelID];
+        Dispute memory dispute = requireGetDispute(state.channelID);
         require(dispute.stateHash == hashState(state), "invalid channel state");
         
-        if (dispute.disputePhase == uint8(DisputePhase.CONCLUDED)) { return; }
-        // if still in phase DISPUTE and the channel has an app, increase the
-        // timeout by one duration to account for phase FORCEEXEC
-        if (dispute.disputePhase == uint8(DisputePhase.DISPUTE) && dispute.hasApp) {
+        // Return immediately if already concluded.
+        if (dispute.phase == uint8(DisputePhase.CONCLUDED)) { return; }
+
+        // If still in phase DISPUTE and the channel has an app, increase the
+        // timeout by one duration to account for phase FORCEEXEC.
+        if (dispute.phase == uint8(DisputePhase.DISPUTE) && dispute.hasApp) {
             dispute.timeout = dispute.timeout.add(dispute.challengeDuration);
         }
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp >= dispute.timeout, "timeout not passed yet");
-        dispute.disputePhase = uint8(DisputePhase.CONCLUDED);
-        disputes[state.channelID] = dispute;
-        emit Concluded(state.channelID, state.version);
+        dispute.phase = uint8(DisputePhase.CONCLUDED);
+
+        setDispute(state.channelID, dispute);
     }
 
     /**
@@ -444,5 +447,33 @@ contract Adjudicator {
             // push accumulated outcome
             AssetHolder(assets[a]).setOutcome(state.channelID, participants, outcome);
         }
+    }
+
+    /**
+     * @dev Returns the dispute state for the given channelID. The second return
+     * value indicates whether the given channel has been registered yet.
+     */
+    function getDispute(bytes32 _channelID) internal view returns (Dispute memory, bool) {
+        Dispute memory dispute = disputes[_channelID];
+        return (dispute, dispute.stateHash != bytes32(0));
+    }
+
+    /**
+     * @dev Returns the dispute state for the given channelID. Reverts if the
+     * channel has not been registered yet.
+     */
+    function requireGetDispute(bytes32 _channelID) internal view returns (Dispute memory) {
+        (Dispute memory dispute, bool registered) = getDispute(_channelID);
+        require(registered, "not registered");
+        return dispute;
+    }
+
+    /**
+     * @dev Sets the dispute state for the given channelID. Emits event
+     * ChannelUpdate.
+     */
+    function setDispute(bytes32 _channelID, Dispute memory dispute) internal {
+        disputes[_channelID] = dispute;
+        emit ChannelUpdate(_channelID, dispute.version, dispute.phase, dispute.timeout);
     }
 }
